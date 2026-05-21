@@ -1,0 +1,1568 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>西島楓與嚴志豪的日常紀錄</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #f6f0ec;
+      --card: #fffaf7;
+      --card-white: #ffffff;
+      --text: #2f2725;
+      --muted: #9a8580;
+      --line: #eaded8;
+      --pink: #e9b7c4;
+      --pink-soft: #fff0f5;
+      --brown: #6f5148;
+      --black: #252120;
+      --black-soft: #393231;
+      --gold: #b8956d;
+      --shadow: 0 18px 45px rgba(67, 47, 42, 0.1);
+      --radius: 24px;
+    }
+
+    body {
+      min-height: 100vh;
+      font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(255, 217, 228, 0.65), transparent 34%),
+        radial-gradient(circle at top right, rgba(190, 170, 154, 0.42), transparent 38%),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.75;
+    }
+
+    button,
+    textarea,
+    input {
+      font-family: inherit;
+    }
+
+    button {
+      border: none;
+      cursor: pointer;
+    }
+
+    .app {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 26px 0 60px;
+    }
+
+    .top-nav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 4px 18px;
+      backdrop-filter: blur(18px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.75), rgba(255,255,255,0.2)),
+        linear-gradient(135deg, #f0b8c8, #2c2522);
+      box-shadow: 0 10px 25px rgba(88, 62, 57, 0.18);
+    }
+
+    .brand h1 {
+      font-size: 20px;
+      letter-spacing: 1px;
+    }
+
+    .brand p {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: -3px;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ghost-btn,
+    .dark-btn {
+      padding: 9px 16px;
+      border-radius: 999px;
+      font-size: 14px;
+      transition: 0.25s;
+    }
+
+    .ghost-btn {
+      background: rgba(255, 255, 255, 0.55);
+      color: var(--brown);
+      border: 1px solid rgba(232, 216, 208, 0.9);
+    }
+
+    .dark-btn {
+      background: var(--black);
+      color: #fff;
+      box-shadow: 0 12px 25px rgba(44, 37, 34, 0.2);
+    }
+
+    .ghost-btn:hover,
+    .dark-btn:hover {
+      transform: translateY(-2px);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 330px;
+      gap: 22px;
+      align-items: start;
+    }
+
+    .main-column,
+    .side-column {
+      min-width: 0;
+    }
+
+    .profile-card {
+      overflow: hidden;
+      border-radius: var(--radius);
+      background: rgba(255, 250, 247, 0.82);
+      border: 1px solid rgba(236, 221, 214, 0.95);
+      box-shadow: var(--shadow);
+    }
+
+    .cover {
+      height: 180px;
+      background:
+        linear-gradient(135deg, rgba(37, 33, 32, 0.56), rgba(111, 81, 72, 0.18)),
+        url("images/cover.jpg");
+      background-size: cover;
+      background-position: center;
+      position: relative;
+    }
+
+    .cover-badge {
+      position: absolute;
+      left: 24px;
+      bottom: 22px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      color: #fff;
+      background: rgba(37, 33, 32, 0.48);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      backdrop-filter: blur(12px);
+      font-size: 13px;
+    }
+
+    .profile-body {
+      padding: 0 24px 24px;
+    }
+
+    .profile-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 16px;
+      margin-top: -42px;
+    }
+
+    .couple-avatars {
+      display: flex;
+      align-items: flex-end;
+    }
+
+    .avatar {
+      width: 92px;
+      height: 92px;
+      border-radius: 50%;
+      border: 5px solid var(--card);
+      object-fit: cover;
+      object-position: center;
+      background: linear-gradient(135deg, #f2c4d1, #fff1e8);
+      box-shadow: 0 12px 28px rgba(69, 44, 39, 0.18);
+    }
+
+    .avatar.yan {
+      margin-left: -22px;
+      background: linear-gradient(135deg, #232020, #7a6d68);
+    }
+
+    .status-pill {
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: #fff;
+      border: 1px solid var(--line);
+      font-size: 13px;
+      color: var(--brown);
+      margin-bottom: 8px;
+      white-space: nowrap;
+    }
+
+    .profile-title {
+      margin-top: 16px;
+    }
+
+    .profile-title h2 {
+      font-size: 26px;
+      letter-spacing: 0.5px;
+    }
+
+    .profile-title p {
+      color: var(--muted);
+      font-size: 14px;
+      margin-top: 2px;
+    }
+
+    .profile-bio {
+      margin-top: 14px;
+      font-size: 15px;
+      color: #4d403d;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .stat {
+      padding: 13px 10px;
+      border-radius: 18px;
+      background: #fff;
+      border: 1px solid var(--line);
+      text-align: center;
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 18px;
+      color: var(--black);
+    }
+
+    .stat span {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin: 18px 0;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: none;
+    }
+
+    .tabs::-webkit-scrollbar {
+      display: none;
+    }
+
+    .tab {
+      flex: 0 0 auto;
+      padding: 9px 15px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.65);
+      color: var(--brown);
+      border: 1px solid var(--line);
+      font-size: 14px;
+      transition: 0.25s;
+    }
+
+    .tab.active {
+      background: var(--black);
+      color: #fff;
+      border-color: var(--black);
+    }
+
+    .composer {
+      display: flex;
+      gap: 14px;
+      padding: 20px;
+      border-radius: var(--radius);
+      background: rgba(255, 250, 247, 0.9);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      margin-bottom: 18px;
+    }
+
+    .mini-avatar {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      object-fit: cover;
+      object-position: center;
+      flex-shrink: 0;
+      border: 2px solid #fff;
+      background: linear-gradient(135deg, #f0b8c8, #fff3e9);
+      box-shadow: 0 8px 18px rgba(70, 45, 40, 0.12);
+    }
+
+    .composer-area {
+      width: 100%;
+    }
+
+    .composer textarea {
+      width: 100%;
+      min-height: 92px;
+      resize: none;
+      outline: none;
+      border: none;
+      background: transparent;
+      font-size: 15px;
+      color: var(--text);
+      line-height: 1.8;
+    }
+
+    .composer-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .composer-tools {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .tool-chip {
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: #fff;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .post-btn {
+      padding: 9px 20px;
+      border-radius: 999px;
+      background: var(--black);
+      color: #fff;
+      font-size: 14px;
+      transition: 0.25s;
+      white-space: nowrap;
+    }
+
+    .post-btn:hover {
+      transform: translateY(-2px);
+      background: var(--brown);
+    }
+
+    .feed {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .post {
+      display: flex;
+      gap: 14px;
+      padding: 20px;
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid var(--line);
+      box-shadow: 0 14px 36px rgba(67, 47, 42, 0.075);
+      transition: 0.25s;
+    }
+
+    .post:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 18px 46px rgba(67, 47, 42, 0.11);
+    }
+
+    .post-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      object-fit: cover;
+      object-position: center;
+      border: 2px solid #fff;
+      background: linear-gradient(135deg, #f0b8c8, #fff1e8);
+      box-shadow: 0 8px 18px rgba(70, 45, 40, 0.1);
+    }
+
+    .post-avatar.yan-fallback {
+      background: linear-gradient(135deg, #24201f, #796b66);
+    }
+
+    .post-main {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .post-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 6px;
+    }
+
+    .author {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .author strong {
+      font-size: 15px;
+    }
+
+    .author span {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .post-time {
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .post-text {
+      font-size: 15px;
+      color: #3e3431;
+      margin-bottom: 14px;
+      white-space: pre-line;
+    }
+
+    .post-image {
+      width: 100%;
+      height: 240px;
+      border-radius: 20px;
+      margin-bottom: 14px;
+      background-size: cover;
+      background-position: center;
+      border: 1px solid var(--line);
+      overflow: hidden;
+    }
+
+    .img-garden {
+      background-image:
+        linear-gradient(135deg, rgba(255, 214, 225, 0.2), rgba(50, 42, 39, 0.08)),
+        url("https://images.unsplash.com/photo-1526047932273-341f2a7631f9?auto=format&fit=crop&w=1200&q=80");
+    }
+
+    .img-cafe {
+      background-image:
+        linear-gradient(135deg, rgba(255, 240, 245, 0.1), rgba(40, 35, 34, 0.14)),
+        url("https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&q=80");
+    }
+
+    .img-night {
+      background-image:
+        linear-gradient(135deg, rgba(37, 33, 32, 0.22), rgba(255, 216, 226, 0.12)),
+        url("https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1200&q=80");
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 14px;
+    }
+
+    .action {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: 0.2s;
+      user-select: none;
+      cursor: pointer;
+    }
+
+    .action:hover {
+      color: var(--brown);
+      transform: scale(1.04);
+    }
+
+    .action.liked {
+      color: #d85f82;
+      font-weight: 700;
+    }
+
+    .action.saved {
+      color: var(--gold);
+      font-weight: 700;
+    }
+
+    .reply-box {
+      position: relative;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: #f8f1ed;
+      border: 1px solid var(--line);
+    }
+
+    .reply-box::before {
+      content: "";
+      position: absolute;
+      left: -23px;
+      top: -14px;
+      width: 22px;
+      height: 36px;
+      border-left: 2px solid var(--line);
+      border-bottom: 2px solid var(--line);
+      border-radius: 0 0 0 18px;
+    }
+
+    .reply-box.dark {
+      background: var(--black);
+      border-color: var(--black);
+      color: #fff;
+    }
+
+    .reply-name {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .reply-text {
+      font-size: 14px;
+      color: inherit;
+    }
+
+    .comment-input {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .comment-input input {
+      flex: 1;
+      padding: 10px 13px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      outline: none;
+      background: rgba(255, 255, 255, 0.72);
+      color: var(--text);
+    }
+
+    .comment-input button {
+      padding: 9px 13px;
+      border-radius: 999px;
+      background: var(--black-soft);
+      color: #fff;
+      font-size: 13px;
+    }
+
+    .side-column {
+      position: sticky;
+      top: 86px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .side-card {
+      padding: 18px;
+      border-radius: var(--radius);
+      background: rgba(255, 250, 247, 0.84);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .side-card h3 {
+      font-size: 16px;
+      margin-bottom: 12px;
+    }
+
+    .today-status {
+      display: grid;
+      gap: 10px;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 16px;
+      background: #fff;
+      border: 1px solid var(--line);
+      font-size: 14px;
+    }
+
+    .status-row span {
+      color: var(--muted);
+    }
+
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .tag {
+      padding: 7px 11px;
+      border-radius: 999px;
+      background: #fff;
+      border: 1px solid var(--line);
+      color: var(--brown);
+      font-size: 13px;
+    }
+
+    .character {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .character:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .character-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      object-fit: cover;
+      object-position: center;
+      flex-shrink: 0;
+      border: 2px solid #fff;
+      background: linear-gradient(135deg, #f0b8c8, #fff1e8);
+    }
+
+    .character-icon.dark {
+      background: linear-gradient(135deg, #252120, #7c6c66);
+    }
+
+    .character strong {
+      display: block;
+      font-size: 14px;
+    }
+
+    .character span {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+
+    .empty {
+      padding: 30px;
+      text-align: center;
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.68);
+      border: 1px dashed #d8c8c1;
+      color: var(--muted);
+    }
+
+    .to-top {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: var(--black);
+      color: #fff;
+      font-size: 22px;
+      box-shadow: 0 14px 32px rgba(44, 37, 34, 0.25);
+      transition: 0.25s;
+      z-index: 60;
+    }
+
+    .to-top:hover {
+      transform: translateY(-3px);
+      background: var(--brown);
+    }
+
+    @media (max-width: 980px) {
+      .app {
+        width: 100%;
+        padding: 0 12px 48px;
+      }
+
+      .layout {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+
+      .side-column {
+        position: static;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px;
+      }
+    }
+
+    @media (max-width: 680px) {
+      body {
+        background: #f6f0ec;
+      }
+
+      .app {
+        width: 100%;
+        padding: 0 10px 72px;
+      }
+
+      .top-nav {
+        position: sticky;
+        top: 0;
+        z-index: 99;
+        padding: 10px 4px;
+        background: rgba(246, 240, 236, 0.88);
+        backdrop-filter: blur(16px);
+      }
+
+      .brand {
+        gap: 9px;
+      }
+
+      .brand-mark {
+        width: 36px;
+        height: 36px;
+      }
+
+      .brand h1 {
+        font-size: 16px;
+        line-height: 1.25;
+      }
+
+      .brand p {
+        display: none;
+      }
+
+      .nav-actions {
+        gap: 6px;
+      }
+
+      .nav-actions .ghost-btn {
+        display: none;
+      }
+
+      .dark-btn {
+        padding: 8px 13px;
+        font-size: 13px;
+      }
+
+      .profile-card,
+      .composer,
+      .post,
+      .side-card {
+        border-radius: 20px;
+      }
+
+      .cover {
+        height: 135px;
+        border-radius: 20px 20px 0 0;
+      }
+
+      .cover-badge {
+        left: 16px;
+        bottom: 16px;
+        font-size: 12px;
+        padding: 6px 11px;
+      }
+
+      .profile-body {
+        padding: 0 16px 18px;
+      }
+
+      .profile-top {
+        margin-top: -34px;
+        align-items: flex-start;
+      }
+
+      .avatar {
+        width: 74px;
+        height: 74px;
+        border-width: 4px;
+      }
+
+      .avatar.yan {
+        margin-left: -18px;
+      }
+
+      .status-pill {
+        margin-top: 40px;
+        max-width: 145px;
+        white-space: normal;
+        line-height: 1.45;
+        font-size: 11px;
+        padding: 7px 10px;
+        text-align: center;
+      }
+
+      .profile-title {
+        margin-top: 14px;
+      }
+
+      .profile-title h2 {
+        font-size: 21px;
+        line-height: 1.35;
+      }
+
+      .profile-title p {
+        font-size: 12px;
+      }
+
+      .profile-bio {
+        font-size: 14px;
+        line-height: 1.8;
+      }
+
+      .stats {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+      }
+
+      .stat {
+        padding: 11px 8px;
+        border-radius: 16px;
+      }
+
+      .stat strong {
+        font-size: 17px;
+      }
+
+      .stat span {
+        font-size: 11px;
+      }
+
+      .tabs {
+        margin: 14px 0;
+        gap: 8px;
+        padding: 0 2px 4px;
+      }
+
+      .tab {
+        font-size: 13px;
+        padding: 8px 13px;
+      }
+
+      .composer {
+        padding: 15px;
+        gap: 11px;
+        margin-bottom: 14px;
+      }
+
+      .mini-avatar {
+        width: 42px;
+        height: 42px;
+      }
+
+      .composer textarea {
+        min-height: 82px;
+        font-size: 14px;
+      }
+
+      .composer-footer {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+
+      .composer-tools {
+        gap: 6px;
+      }
+
+      .tool-chip {
+        font-size: 12px;
+        padding: 6px 9px;
+      }
+
+      .post-btn {
+        width: 100%;
+        padding: 10px 18px;
+      }
+
+      .feed {
+        gap: 12px;
+      }
+
+      .post {
+        padding: 15px;
+        gap: 11px;
+      }
+
+      .post-avatar {
+        width: 42px;
+        height: 42px;
+      }
+
+      .post-head {
+        gap: 6px;
+      }
+
+      .author strong {
+        font-size: 14px;
+      }
+
+      .author span,
+      .post-time {
+        font-size: 12px;
+      }
+
+      .post-text {
+        font-size: 14px;
+        line-height: 1.8;
+        margin-bottom: 12px;
+      }
+
+      .post-image {
+        height: 180px;
+        border-radius: 16px;
+      }
+
+      .actions {
+        gap: 13px;
+        font-size: 13px;
+      }
+
+      .reply-box {
+        padding: 12px 13px;
+        border-radius: 16px;
+      }
+
+      .reply-box::before {
+        display: none;
+      }
+
+      .reply-name {
+        font-size: 12px;
+      }
+
+      .reply-text {
+        font-size: 13px;
+        line-height: 1.75;
+      }
+
+      .comment-input {
+        gap: 7px;
+      }
+
+      .comment-input input {
+        min-width: 0;
+        padding: 9px 11px;
+        font-size: 13px;
+      }
+
+      .comment-input button {
+        padding: 9px 11px;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .side-column {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      .side-card {
+        padding: 16px;
+      }
+
+      .side-card h3 {
+        font-size: 15px;
+      }
+
+      .status-row {
+        font-size: 13px;
+      }
+
+      .tag {
+        font-size: 12px;
+        padding: 6px 10px;
+      }
+
+      .character {
+        align-items: flex-start;
+      }
+
+      .character span {
+        line-height: 1.55;
+      }
+
+      .to-top {
+        right: 16px;
+        bottom: 16px;
+        width: 46px;
+        height: 46px;
+        font-size: 19px;
+      }
+    }
+
+    @media (max-width: 380px) {
+      .profile-title h2 {
+        font-size: 19px;
+      }
+
+      .status-pill {
+        max-width: 125px;
+        font-size: 10.5px;
+      }
+
+      .avatar {
+        width: 68px;
+        height: 68px;
+      }
+
+      .post {
+        padding: 13px;
+      }
+
+      .post-avatar {
+        width: 39px;
+        height: 39px;
+      }
+
+      .actions {
+        gap: 10px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <nav class="top-nav">
+      <div class="brand">
+        <div class="brand-mark"></div>
+
+        <div>
+          <h1>西島楓與嚴志豪</h1>
+          <p>Daily archive of Kaede and Zhihao</p>
+        </div>
+      </div>
+
+      <div class="nav-actions">
+        <button class="ghost-btn" onclick="filterPosts('all')">全部日常</button>
+        <button class="dark-btn" onclick="focusComposer()">新增紀錄</button>
+      </div>
+    </nav>
+
+    <div class="layout">
+      <main class="main-column">
+        <section class="profile-card">
+          <div class="cover">
+            <div class="cover-badge">Private Daily Thread</div>
+          </div>
+
+          <div class="profile-body">
+            <div class="profile-top">
+              <div class="couple-avatars">
+                <img class="avatar" src="images/kaede.jpg" alt="西島楓頭像" onerror="this.style.display='none'; this.insertAdjacentHTML('afterend', '<div class=&quot;avatar&quot;></div>');">
+                <img class="avatar yan" src="images/zhihao.jpg" alt="嚴志豪頭像" onerror="this.style.display='none'; this.insertAdjacentHTML('afterend', '<div class=&quot;avatar yan&quot;></div>');">
+              </div>
+
+              <div class="status-pill">今日狀態：嚴志豪低氣壓，但會牽手</div>
+            </div>
+
+            <div class="profile-title">
+              <h2>西島楓 × 嚴志豪的日常紀錄</h2>
+              <p>@kaede_zhihao_daily · 韓國生活 · 夫妻日常</p>
+            </div>
+
+            <p class="profile-bio">
+              這裡用來收藏西島楓和嚴志豪的日常，有花園澆花、約會、吃醋、吵架、撒嬌，還有理事長大人那些明明很在意卻偏要冷著臉的瞬間。
+            </p>
+
+            <div class="stats">
+              <div class="stat">
+                <strong id="postCount">0</strong>
+                <span>篇紀錄</span>
+              </div>
+
+              <div class="stat">
+                <strong>128</strong>
+                <span>次吃醋</span>
+              </div>
+
+              <div class="stat">
+                <strong>56</strong>
+                <span>次牽手</span>
+              </div>
+
+              <div class="stat">
+                <strong>21</strong>
+                <span>次冷戰</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="tabs" id="tabs">
+          <button class="tab active" onclick="filterPosts('all')">全部</button>
+          <button class="tab" onclick="filterPosts('daily')">日常</button>
+          <button class="tab" onclick="filterPosts('date')">約會</button>
+          <button class="tab" onclick="filterPosts('jealous')">吃醋</button>
+          <button class="tab" onclick="filterPosts('kids')">小孩</button>
+          <button class="tab" onclick="filterPosts('fight')">吵架</button>
+          <button class="tab" onclick="filterPosts('sweet')">撒嬌</button>
+        </section>
+
+        <section class="composer">
+          <img class="mini-avatar" src="images/kaede.jpg" alt="西島楓頭像" onerror="this.style.display='none'; this.insertAdjacentHTML('afterend', '<div class=&quot;mini-avatar&quot;></div>');">
+
+          <div class="composer-area">
+            <textarea id="postInput" placeholder="今天想記錄什麼？例如：嚴志豪今天又不讓我穿短裙出門了……"></textarea>
+
+            <div class="composer-footer">
+              <div class="composer-tools">
+                <span class="tool-chip">🌸 西島楓</span>
+                <span class="tool-chip">🖤 嚴志豪</span>
+                <span class="tool-chip">📷 日常照片</span>
+                <span class="tool-chip">🏷️ 自動分類</span>
+              </div>
+
+              <button class="post-btn" onclick="addPost()">發布</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="feed" id="feed"></section>
+      </main>
+
+      <aside class="side-column">
+        <section class="side-card">
+          <h3>今日小狀態</h3>
+
+          <div class="today-status">
+            <div class="status-row">
+              <span>西島楓</span>
+              <strong>想撒嬌</strong>
+            </div>
+
+            <div class="status-row">
+              <span>嚴志豪</span>
+              <strong>表面冷淡</strong>
+            </div>
+
+            <div class="status-row">
+              <span>危險指數</span>
+              <strong>吃醋中</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="side-card">
+          <h3>常用標籤</h3>
+
+          <div class="tag-list">
+            <span class="tag">#嚴太太</span>
+            <span class="tag">#理事長</span>
+            <span class="tag">#花園澆花</span>
+            <span class="tag">#漢江夜景</span>
+            <span class="tag">#吃醋現場</span>
+            <span class="tag">#嚴知恆</span>
+            <span class="tag">#嚴知安</span>
+            <span class="tag">#韓國生活</span>
+          </div>
+        </section>
+
+        <section class="side-card">
+          <h3>人物小檔案</h3>
+
+          <div class="character">
+            <img class="character-icon" src="images/kaede.jpg" alt="西島楓" onerror="this.style.display='none'; this.insertAdjacentHTML('afterend', '<div class=&quot;character-icon&quot;></div>');">
+
+            <div>
+              <strong>西島楓</strong>
+              <span>漂亮、靈動、愛撒嬌，偶爾故意惹嚴志豪吃醋。</span>
+            </div>
+          </div>
+
+          <div class="character">
+            <img class="character-icon dark" src="images/zhihao.jpg" alt="嚴志豪" onerror="this.style.display='none'; this.insertAdjacentHTML('afterend', '<div class=&quot;character-icon dark&quot;></div>');">
+
+            <div>
+              <strong>嚴志豪</strong>
+              <span>冷峻、強勢、控制慾重，但對嚴太太有專屬例外。</span>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <button class="to-top" onclick="scrollToTop()">↑</button>
+
+  <script>
+    const posts = [
+      {
+        id: 1,
+        category: "jealous",
+        author: "西島楓",
+        handle: "@kaede",
+        avatar: "kaede",
+        time: "剛剛",
+        text: "今天只是想穿短裙去花園澆花，結果嚴志豪從客廳看了我一眼，下一秒就把外套披到我肩上。\n\n我說又沒有人會看，他只冷冷回我一句：外面有監視器，也有鄰居。",
+        image: "img-garden",
+        likes: 256,
+        comments: 38,
+        reposts: 12,
+        saved: 8,
+        replyName: "嚴志豪",
+        replyText: "不是不讓妳穿，是妳沒必要讓別人看見。",
+        darkReply: true
+      },
+      {
+        id: 2,
+        category: "date",
+        author: "嚴志豪",
+        handle: "@zhihao",
+        avatar: "yan",
+        time: "1 小時前",
+        text: "她說只是出門買甜點，結果在櫥窗前看了二十分鐘。最後買回來第一口還要先餵我，理由是這樣比較像約會。",
+        image: "img-cafe",
+        likes: 412,
+        comments: 59,
+        reposts: 18,
+        saved: 22,
+        replyName: "西島楓",
+        replyText: "你明明就有吃掉！還裝得好像被我逼的一樣！",
+        darkReply: false
+      },
+      {
+        id: 3,
+        category: "sweet",
+        author: "西島楓",
+        handle: "@kaede",
+        avatar: "kaede",
+        time: "昨天",
+        text: "晚上在漢江邊散步，我說手有點冷，嚴志豪沒有說話，只是把我的手整個包進他的大衣口袋裡。\n\n他真的很討厭，連溫柔都要裝成命令。",
+        image: "img-night",
+        likes: 688,
+        comments: 92,
+        reposts: 31,
+        saved: 40,
+        replyName: "嚴志豪",
+        replyText: "冷就靠近一點，不要等我提醒。",
+        darkReply: true
+      },
+      {
+        id: 4,
+        category: "kids",
+        author: "西島楓",
+        handle: "@kaede",
+        avatar: "kaede",
+        time: "2 天前",
+        text: "知安今天說爸爸看起來很兇，但是抱起來很暖。知恆沒有說話，可是一直偷偷拉嚴志豪的袖口。\n\n然後嚴志豪表面上很冷靜，實際上把兩個小孩都抱去沙發上了。",
+        image: "",
+        likes: 531,
+        comments: 77,
+        reposts: 20,
+        saved: 35,
+        replyName: "嚴志豪",
+        replyText: "他們只是困了。",
+        darkReply: true
+      },
+      {
+        id: 5,
+        category: "fight",
+        author: "西島楓",
+        handle: "@kaede",
+        avatar: "kaede",
+        time: "3 天前",
+        text: "今天跟嚴志豪冷戰了。原因是他又擅自幫我安排司機，還說這不是限制，是安全。\n\n我氣到不想理他，他就坐在旁邊看文件，看起來很冷靜，可是五分鐘看了我八次。",
+        image: "",
+        likes: 347,
+        comments: 64,
+        reposts: 9,
+        saved: 16,
+        replyName: "嚴志豪",
+        replyText: "我看妳，是因為妳一直瞪我。",
+        darkReply: true
+      },
+      {
+        id: 6,
+        category: "daily",
+        author: "嚴志豪",
+        handle: "@zhihao",
+        avatar: "yan",
+        time: "4 天前",
+        text: "她說要早睡，結果抱著枕頭在床上講了二十分鐘今天的白玫瑰開得多漂亮。講到最後自己睡著，手還抓著我的襯衫。",
+        image: "",
+        likes: 602,
+        comments: 81,
+        reposts: 24,
+        saved: 33,
+        replyName: "西島楓",
+        replyText: "那你可以把襯衫借我抱啊，反正有你的味道。",
+        darkReply: false
+      }
+    ];
+
+    let currentCategory = "all";
+
+    function renderPosts() {
+      const feed = document.getElementById("feed");
+
+      const filtered = currentCategory === "all"
+        ? posts
+        : posts.filter(post => post.category === currentCategory);
+
+      document.getElementById("postCount").textContent = posts.length;
+
+      if (filtered.length === 0) {
+        feed.innerHTML = `<div class="empty">這個分類還沒有日常紀錄。</div>`;
+        return;
+      }
+
+      feed.innerHTML = filtered.map(post => {
+        const avatarSrc = post.avatar === "yan" ? "images/zhihao.jpg" : "images/kaede.jpg";
+        const fallbackClass = post.avatar === "yan" ? "yan-fallback" : "";
+
+        return `
+          <article class="post" data-id="${post.id}">
+            <img 
+              class="post-avatar ${fallbackClass}" 
+              src="${avatarSrc}" 
+              alt="${post.author}頭像"
+              onerror="this.style.display='none'; this.insertAdjacentHTML('afterend', '<div class=&quot;post-avatar ${fallbackClass}&quot;></div>');"
+            >
+
+            <div class="post-main">
+              <div class="post-head">
+                <div class="author">
+                  <strong>${post.author}</strong>
+                  <span>${post.handle}</span>
+                </div>
+
+                <div class="post-time">${post.time}</div>
+              </div>
+
+              <p class="post-text">${escapeHTML(post.text)}</p>
+
+              ${post.image ? `<div class="post-image ${post.image}"></div>` : ""}
+
+              <div class="actions">
+                <span class="action" onclick="toggleLike(this)">♡ <span>${post.likes}</span></span>
+                <span class="action">💬 <span>${post.comments}</span></span>
+                <span class="action">↻ <span>${post.reposts}</span></span>
+                <span class="action" onclick="toggleSave(this)">✦ <span>${post.saved}</span></span>
+              </div>
+
+              <div class="reply-box ${post.darkReply ? "dark" : ""}">
+                <div class="reply-name">${post.replyName} 回覆</div>
+                <div class="reply-text">「${escapeHTML(post.replyText)}」</div>
+              </div>
+
+              <div class="comment-input">
+                <input type="text" placeholder="偷偷留言一句……" />
+                <button onclick="addComment(this)">留言</button>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join("");
+    }
+
+    function filterPosts(category) {
+      currentCategory = category;
+
+      document.querySelectorAll(".tab").forEach(tab => {
+        tab.classList.remove("active");
+      });
+
+      const tabs = document.querySelectorAll(".tab");
+
+      tabs.forEach(tab => {
+        const text = tab.textContent.trim();
+
+        if (
+          (category === "all" && text === "全部") ||
+          (category === "daily" && text === "日常") ||
+          (category === "date" && text === "約會") ||
+          (category === "jealous" && text === "吃醋") ||
+          (category === "kids" && text === "小孩") ||
+          (category === "fight" && text === "吵架") ||
+          (category === "sweet" && text === "撒嬌")
+        ) {
+          tab.classList.add("active");
+        }
+      });
+
+      renderPosts();
+    }
+
+    function addPost() {
+      const input = document.getElementById("postInput");
+      const text = input.value.trim();
+
+      if (!text) {
+        alert("先寫一點日常再發布喔！");
+        return;
+      }
+
+      const category = guessCategory(text);
+
+      posts.unshift({
+        id: Date.now(),
+        category,
+        author: "西島楓",
+        handle: "@kaede",
+        avatar: "kaede",
+        time: "剛剛",
+        text,
+        image: "",
+        likes: 0,
+        comments: 0,
+        reposts: 0,
+        saved: 0,
+        replyName: "嚴志豪",
+        replyText: getYanReply(category),
+        darkReply: true
+      });
+
+      input.value = "";
+      currentCategory = "all";
+
+      document.querySelectorAll(".tab").forEach(tab => tab.classList.remove("active"));
+      document.querySelectorAll(".tab")[0].classList.add("active");
+
+      renderPosts();
+
+      document.querySelector(".feed").scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    }
+
+    function guessCategory(text) {
+      const t = text.toLowerCase();
+
+      if (t.includes("吃醋") || t.includes("別人") || t.includes("男人") || t.includes("靠近")) {
+        return "jealous";
+      }
+
+      if (t.includes("約會") || t.includes("咖啡") || t.includes("甜點") || t.includes("漢江")) {
+        return "date";
+      }
+
+      if (t.includes("知安") || t.includes("知恆") || t.includes("小孩") || t.includes("幼兒園")) {
+        return "kids";
+      }
+
+      if (t.includes("吵架") || t.includes("冷戰") || t.includes("生氣") || t.includes("討厭你")) {
+        return "fight";
+      }
+
+      if (t.includes("抱") || t.includes("親") || t.includes("撒嬌") || t.includes("想你")) {
+        return "sweet";
+      }
+
+      return "daily";
+    }
+
+    function getYanReply(category) {
+      const replies = {
+        daily: "我看到了。下次不要寫得像我很閒。",
+        date: "妳想去，我會安排。",
+        jealous: "我不喜歡別人靠近妳，這件事不需要再問。",
+        kids: "他們今天很乖，妳也是。",
+        fight: "鬧夠了就過來，我不想再看妳離我那麼遠。",
+        sweet: "想撒嬌就直說，不要繞那麼多。"
+      };
+
+      return replies[category] || replies.daily;
+    }
+
+    function toggleLike(el) {
+      const countSpan = el.querySelector("span");
+      let count = Number(countSpan.textContent);
+
+      if (el.classList.contains("liked")) {
+        el.classList.remove("liked");
+        countSpan.textContent = count - 1;
+        el.firstChild.textContent = "♡ ";
+      } else {
+        el.classList.add("liked");
+        countSpan.textContent = count + 1;
+        el.firstChild.textContent = "♥ ";
+      }
+    }
+
+    function toggleSave(el) {
+      const countSpan = el.querySelector("span");
+      let count = Number(countSpan.textContent);
+
+      if (el.classList.contains("saved")) {
+        el.classList.remove("saved");
+        countSpan.textContent = count - 1;
+      } else {
+        el.classList.add("saved");
+        countSpan.textContent = count + 1;
+      }
+    }
+
+    function addComment(button) {
+      const input = button.previousElementSibling;
+      const value = input.value.trim();
+
+      if (!value) {
+        alert("先輸入留言喔！");
+        return;
+      }
+
+      alert("留言成功：" + value);
+      input.value = "";
+    }
+
+    function focusComposer() {
+      const postInput = document.getElementById("postInput");
+
+      postInput.focus();
+      postInput.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
+    }
+
+    function scrollToTop() {
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+      });
+    }
+
+    function escapeHTML(str) {
+      return str.replace(/[&<>"']/g, function(match) {
+        const escapeMap = {
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#039;"
+        };
+
+        return escapeMap[match];
+      });
+    }
+
+    renderPosts();
+  </script>
+</body>
+</html>

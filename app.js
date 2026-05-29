@@ -1,79 +1,77 @@
-const STORAGE_POSTS = "kaede_social_posts_v4_all";
-const STORAGE_LIKES = "kaede_social_likes_v4";
+const STORAGE_POSTS = "jz_posts_v2_comments";
+const STORAGE_LIKES = "jz_likes_v1";
+const STORAGE_MESSAGES = "jz_messages_v1";
+const STORAGE_PROMPTS = "jz_prompts_v1";
+const STORAGE_OPEN_MODE = "jz_open_mode_v1";
 
-let currentView = "profile";
-let previousView = "profile";
+let currentView = "home";
+let previousView = "home";
 let currentProfileUser = "kaede";
 let currentProfileTab = "posts";
-let selectedImageData = "";
+let currentChatUser = "zhihao";
 
-let posts = loadPosts();
-let likedPostIds = loadLikes();
+let posts = normalizePosts(loadJSON(STORAGE_POSTS, defaultPosts));
+let likedPostIds = loadJSON(STORAGE_LIKES, []);
+let messages = loadJSON(STORAGE_MESSAGES, {});
+let savedCharacterPrompts = loadJSON(STORAGE_PROMPTS, {});
+let characterPrompts = Object.fromEntries(Object.values(users).map(user => [
+  user.id,
+  savedCharacterPrompts[user.id] || buildCommentPrompt(user)
+]));
+let openMode = localStorage.getItem(STORAGE_OPEN_MODE) === "true";
 
-function loadPosts() {
-  const saved = localStorage.getItem(STORAGE_POSTS);
-
-  if (!saved) {
-    return sortPosts(defaultPosts.map(post => ({
-      ...post,
-      createdAt: post.createdAt || post.id
-    })));
-  }
-
+function loadJSON(key, fallback) {
   try {
-    const savedPosts = JSON.parse(saved);
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
-    return sortPosts(savedPosts.map(post => ({
+function saveJSON(key, value) {
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
+function normalizePosts(list) {
+  return list.map((post, index) => {
+    const comments = Array.isArray(post.comments) ? post.comments : [];
+
+    if (post.reply && comments.length === 0) {
+      comments.push({
+        id: Number(`${post.id}01`),
+        author: "me",
+        text: "我想聽你怎麼說。",
+        time: "剛剛",
+        replies: [{
+          id: Number(`${post.id}02`),
+          author: post.reply.author,
+          text: post.reply.text,
+          time: "剛剛"
+        }]
+      });
+    }
+
+    return {
       ...post,
-      createdAt: post.createdAt || post.id || Date.now()
-    })));
-  } catch (error) {
-    return sortPosts(defaultPosts.map(post => ({
-      ...post,
-      createdAt: post.createdAt || post.id
-    })));
-  }
-}
-
-function saveLocalPosts() {
-  localStorage.setItem(STORAGE_POSTS, JSON.stringify(posts));
-}
-
-function loadLikes() {
-  const saved = localStorage.getItem(STORAGE_LIKES);
-
-  if (!saved) {
-    return [];
-  }
-
-  try {
-    return JSON.parse(saved);
-  } catch (error) {
-    return [];
-  }
-}
-
-function saveLikes() {
-  localStorage.setItem(STORAGE_LIKES, JSON.stringify(likedPostIds));
-}
-
-function sortPosts(list) {
-  return [...list].sort((a, b) => {
-    const aTime = Number(a.createdAt || a.id || 0);
-    const bTime = Number(b.createdAt || b.id || 0);
-    return bTime - aTime;
+      reply: undefined,
+      comments,
+      createdAt: post.createdAt || post.id || index
+    };
   });
 }
 
-function normalizeText(str) {
-  return String(str || "")
-    .replace(/\r\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+function normalizeText(value) {
+  return String(value || "").replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 function getUser(id) {
-  return users[id] || users.kaede;
+  return users[id] || users.me || users.kaede;
+}
+
+function setActiveView(viewId) {
+  document.querySelectorAll(".view").forEach(view => view.classList.remove("active"));
+  document.getElementById(viewId)?.classList.add("active");
 }
 
 function setTopbar(title, showBack = false) {
@@ -81,27 +79,23 @@ function setTopbar(title, showBack = false) {
   document.getElementById("backBtn").style.display = showBack ? "flex" : "none";
 }
 
-function setActiveView(viewId) {
-  document.querySelectorAll(".view").forEach(view => {
-    view.classList.remove("active");
-  });
-
-  const targetView = document.getElementById(viewId);
-
-  if (targetView) {
-    targetView.classList.add("active");
-  }
-}
-
 function setNav(active) {
-  document.querySelectorAll(".nav-item").forEach(item => {
-    item.classList.remove("active");
-  });
-
+  document.querySelectorAll(".nav-item").forEach(item => item.classList.remove("active"));
   if (active === "home") document.getElementById("navHome").classList.add("active");
   if (active === "search") document.getElementById("navSearch").classList.add("active");
+  if (active === "messages") document.getElementById("navMessages").classList.add("active");
   if (active === "liked") document.getElementById("navLiked").classList.add("active");
   if (active === "profile") document.getElementById("navProfile").classList.add("active");
+}
+
+function showHome() {
+  previousView = currentView;
+  currentView = "home";
+  setActiveView("homeView");
+  setNav("home");
+  setTopbar("動態", false);
+  renderHomeFeed();
+  scrollToTop();
 }
 
 function showProfile(userId = "kaede") {
@@ -109,185 +103,138 @@ function showProfile(userId = "kaede") {
   currentView = "profile";
   currentProfileUser = userId;
   currentProfileTab = "posts";
-
   setActiveView("profileView");
   setNav(userId === "kaede" ? "profile" : "");
-  setTopbar(getUser(userId).name, userId !== "kaede");
-
+  setTopbar(getUser(userId).name, true);
   renderProfile();
   renderProfileFeed();
-
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
-}
-
-function showHome() {
-  previousView = currentView;
-  currentView = "home";
-
-  setActiveView("homeView");
-  setNav("home");
-  setTopbar("動態", false);
-  renderHomeFeed();
-
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
+  scrollToTop();
 }
 
 function showSearch() {
   previousView = currentView;
   currentView = "search";
-
   setActiveView("searchView");
   setNav("search");
   setTopbar("搜尋", false);
   renderSearch();
+  scrollToTop();
+}
 
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
+function showMessages(userId = currentChatUser) {
+  previousView = currentView;
+  currentView = "messages";
+  currentChatUser = userId === "me" ? "zhihao" : userId;
+  setActiveView("messagesView");
+  setNav("messages");
+  setTopbar("私訊", false);
+  renderMessages();
+  scrollToTop();
 }
 
 function showLiked() {
   previousView = currentView;
   currentView = "liked";
-
   setActiveView("likedView");
   setNav("liked");
-  setTopbar("已按讚", false);
+  setTopbar("已喜歡", false);
   renderLikedFeed();
-
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
+  scrollToTop();
 }
 
 function showAdmin() {
   previousView = currentView;
   currentView = "admin";
-
   setActiveView("adminView");
   setNav("");
   setTopbar("管理者模式", true);
-
-  renderAdminPostSelect();
-
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
+  renderPromptSelect();
+  scrollToTop();
 }
 
 function goBack() {
-  if (currentView === "admin") {
-    showHome();
-    return;
-  }
+  showHome();
+}
 
-  showProfile("kaede");
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function sortPosts(list) {
+  return [...list].sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+}
+
+function renderHomeFeed() {
+  renderFeed("homeFeed", sortPosts(posts));
+}
+
+function renderLikedFeed() {
+  const liked = sortPosts(posts.filter(post => likedPostIds.includes(post.id)));
+  document.getElementById("likedFeed").innerHTML = liked.length ? "" : `<div class="empty">還沒有喜歡的貼文。</div>`;
+  if (liked.length) renderFeed("likedFeed", liked);
 }
 
 function renderProfile() {
   const user = getUser(currentProfileUser);
   const userPosts = posts.filter(post => post.author === user.id);
-  const mediaCount = userPosts.filter(post => post.image).length;
 
   document.getElementById("profileArea").innerHTML = `
-    <div class="cover" style="background-image: linear-gradient(to bottom, rgba(0,0,0,0.05), rgba(0,0,0,0.22)), url('${user.cover}')"></div>
-
     <div class="profile-inner">
       <div class="identity-row">
-        <img class="avatar-big" src="${user.avatar}" alt="${user.name}" onerror="this.style.visibility='hidden'">
-
+        <img class="avatar-big" src="${user.avatar}" alt="${escapeAttribute(user.name)}">
         ${
-          user.id === "kaede"
-            ? `<button class="profile-action" onclick="focusComposer()">新增紀錄</button>`
-            : `<button class="profile-action light" onclick="showToast('已追蹤 ${user.name}')">追蹤</button>`
+          user.id === "me" || user.id === "kaede"
+            ? `<button class="profile-action" onclick="focusComposer()">新增動態</button>`
+            : `<div class="profile-actions">
+                <button class="profile-action" onclick="showMessages('${user.id}')">私訊</button>
+                <button class="profile-action light" onclick="showToast('已追蹤 ${escapeAttribute(user.name)}')">追蹤</button>
+              </div>`
         }
       </div>
-
-      <div class="name-block">
-        <h1 class="display-name">${user.name}</h1>
-        <div class="handle">${user.handle}</div>
-      </div>
-
-      <p class="bio">${escapeHTML(normalizeText(user.bio))}</p>
-
-      <div class="tags">
-        ${user.tags.map(tag => `<span class="tag">${tag}</span>`).join("")}
-      </div>
-
+      <h1 class="display-name">${escapeHTML(user.name)}</h1>
+      <div class="handle">${escapeHTML(user.handle)}</div>
+      <p class="bio">${escapeHTML(user.bio)}</p>
+      <div class="tags">${(user.tags || []).map(tag => `<span class="tag">${escapeHTML(tag)}</span>`).join("")}</div>
       <div class="stats">
         <span><strong>${userPosts.length}</strong> 則貼文</span>
-        <span><strong>${mediaCount}</strong> 張照片</span>
-        <span><strong>${user.followers}</strong> 追蹤者</span>
+        <span><strong>${getProfileReplyCount(user.id)}</strong> 則回覆</span>
       </div>
     </div>
   `;
 
-  document.querySelectorAll("#profileView .tab").forEach(tab => {
-    tab.classList.remove("active");
-  });
+  document.querySelectorAll("#profileView .tab").forEach(tab => tab.classList.remove("active"));
+  document.querySelector("#profileView .tab")?.classList.add("active");
+}
 
-  document.querySelectorAll("#profileView .tab")[0].classList.add("active");
+function getProfileReplyCount(userId) {
+  return posts.reduce((count, post) => {
+    return count + post.comments.reduce((sum, comment) => {
+      const ownComment = comment.author === userId ? 1 : 0;
+      const nestedReplies = (comment.replies || []).filter(reply => reply.author === userId).length;
+      return sum + ownComment + nestedReplies;
+    }, 0);
+  }, 0);
 }
 
 function setProfileTab(tab, button) {
   currentProfileTab = tab;
-
-  document.querySelectorAll("#profileView .tab").forEach(item => {
-    item.classList.remove("active");
-  });
-
+  document.querySelectorAll("#profileView .tab").forEach(item => item.classList.remove("active"));
   button.classList.add("active");
   renderProfileFeed();
 }
 
 function renderProfileFeed() {
   let list = posts.filter(post => post.author === currentProfileUser);
-
-  if (currentProfileTab === "media") {
-    list = list.filter(post => post.image);
-  }
-
   if (currentProfileTab === "replies") {
-    list = posts.filter(post => post.reply && post.reply.author === currentProfileUser);
+    list = posts.filter(post => post.comments.some(comment => {
+      return comment.author === currentProfileUser || (comment.replies || []).some(reply => reply.author === currentProfileUser);
+    }));
   }
-
   renderFeed("profileFeed", sortPosts(list));
-}
-
-function renderHomeFeed() {
-  posts = sortPosts(posts);
-  renderFeed("homeFeed", posts);
-}
-
-function renderLikedFeed() {
-  const liked = sortPosts(posts.filter(post => likedPostIds.includes(post.id)));
-
-  if (liked.length === 0) {
-    document.getElementById("likedFeed").innerHTML = `
-      <div class="empty">
-        還沒有按讚的貼文。<br>
-        在動態或個人頁點愛心後，會出現在這裡。
-      </div>
-    `;
-
-    return;
-  }
-
-  renderFeed("likedFeed", liked);
 }
 
 function renderFeed(containerId, list) {
   const container = document.getElementById(containerId);
-
   if (!container) return;
 
   if (!list.length) {
@@ -295,735 +242,457 @@ function renderFeed(containerId, list) {
     return;
   }
 
-  container.innerHTML = list.map(post => {
-    const author = getUser(post.author);
-    const liked = likedPostIds.includes(post.id);
-
-    return `
-      <article class="thread">
-        <div class="thread-left">
-          <img class="avatar" src="${author.avatar}" alt="${author.name}" onclick="showProfile('${author.id}')" onerror="this.style.visibility='hidden'">
-          <div class="thread-line"></div>
-        </div>
-
-        <div class="thread-main">
-          <div class="post-head">
-            <div class="author" onclick="showProfile('${author.id}')">
-              <span class="post-name">${author.name}</span>
-              <span class="post-id">${author.handle}</span>
-              <span class="post-time">· ${post.time}</span>
-            </div>
-
-            <button class="more" onclick="showPostMenu(${post.id})">⋯</button>
-          </div>
-
-          <p class="post-text">${escapeHTML(normalizeText(post.text))}</p>
-
-          ${
-            post.image
-              ? `
-                <div class="post-photo">
-                  <img src="${post.image}" alt="日常照片" onerror="this.parentElement.style.display='none'">
-                </div>
-              `
-              : ""
-          }
-
-          <div class="actions">
-            <button class="action ${liked ? "liked" : ""}" onclick="toggleLike(${post.id}, this)">${liked ? "♥" : "♡"}</button>
-            <button class="action" onclick="showToast('回覆 ${author.name}')">💬</button>
-            <button class="action" onclick="showToast('已轉發')">↻</button>
-            <button class="action" onclick="showToast('已分享')">↗</button>
-          </div>
-
-          <div class="meta">${Number(post.replies || 0)} 則回覆 · ${Number(post.likes || 0) + (liked ? 1 : 0)} 個喜歡</div>
-
-          ${post.reply ? renderReply(post.reply) : ""}
-
-          ${
-            post.local
-              ? `<button class="delete-btn" onclick="deletePost(${post.id})">刪除這則紀錄</button>`
-              : ""
-          }
-        </div>
-      </article>
-    `;
-  }).join("");
+  container.innerHTML = list.map(renderPost).join("");
 }
 
-function renderReply(reply) {
-  const replyUser = getUser(reply.author);
+function renderPost(post) {
+  const author = getUser(post.author);
+  const liked = likedPostIds.includes(post.id);
 
   return `
-    <div class="reply">
-      <img class="avatar" src="${replyUser.avatar}" alt="${replyUser.name}" onclick="showProfile('${replyUser.id}')" onerror="this.style.visibility='hidden'">
-
-      <div class="reply-main">
-        <div class="reply-head" onclick="showProfile('${replyUser.id}')">
-          <span class="reply-name">${replyUser.name}</span>
-          <span class="reply-id">${replyUser.handle}</span>
-        </div>
-
-        <p class="reply-text">${escapeHTML(normalizeText(reply.text))}</p>
+    <article class="thread">
+      <div class="thread-left">
+        <img class="avatar" src="${author.avatar}" alt="${escapeAttribute(author.name)}" onclick="showProfile('${author.id}')">
+        <div class="thread-line"></div>
       </div>
+      <div class="thread-main">
+        <div class="post-head">
+          <div class="author" onclick="showProfile('${author.id}')">
+            <span class="post-name">${escapeHTML(author.name)}</span>
+            <span class="post-id">${escapeHTML(author.handle)}</span>
+            <span class="post-time">· ${escapeHTML(post.time || "剛剛")}</span>
+          </div>
+          <button class="more" onclick="showMessages('${author.id}')">私訊</button>
+        </div>
+        <p class="post-text">${escapeHTML(post.text)}</p>
+        ${post.image ? `<div class="post-photo"><img src="${post.image}" alt="貼文圖片"></div>` : ""}
+        <div class="actions">
+          <button class="action ${liked ? "liked" : ""}" onclick="toggleLike(${post.id})">${liked ? "♥" : "♡"}</button>
+          <button class="action" onclick="focusComment(${post.id})">💬</button>
+          <button class="action" onclick="showToast('已分享')">↗</button>
+        </div>
+        <div class="meta">${Number(post.replies || 0)} 則回覆 · ${Number(post.likes || 0) + (liked ? 1 : 0)} 個喜歡</div>
+        ${renderComments(post)}
+        <div class="reply-input">
+          <input id="commentInput-${post.id}" placeholder="留言給 ${escapeAttribute(author.name)}..." onkeydown="handleCommentKey(event, ${post.id})">
+          <button onclick="submitPostComment(${post.id})">送出</button>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function renderComments(post) {
+  if (!post.comments.length) return "";
+
+  return `
+    <div class="comment-list">
+      ${post.comments.map(comment => {
+        const commentUser = getUser(comment.author);
+        return `
+          <div class="comment-item">
+            <img class="avatar comment-avatar" src="${commentUser.avatar}" alt="${escapeAttribute(commentUser.name)}">
+            <div class="comment-main">
+              <div class="comment-bubble">
+                <span class="comment-name">${escapeHTML(commentUser.name)}</span>
+                <span class="comment-text">${escapeHTML(comment.text)}</span>
+              </div>
+              <div class="comment-time">${escapeHTML(comment.time || "剛剛")}</div>
+              ${renderCommentReplies(comment)}
+            </div>
+          </div>
+        `;
+      }).join("")}
     </div>
   `;
 }
 
-function renderSearch() {
-  const input = document.getElementById("searchInput");
-  const keyword = (input?.value || "").trim().toLowerCase();
+function renderCommentReplies(comment) {
+  if (!comment.replies?.length) return "";
 
-  const list = Object.values(users).filter(user => {
-    const text = `${user.name} ${user.handle} ${user.bio} ${user.tags.join(" ")}`.toLowerCase();
-    return text.includes(keyword);
-  });
-
-  const accountList = document.getElementById("accountList");
-
-  if (!accountList) return;
-
-  if (!list.length) {
-    accountList.innerHTML = `<div class="empty">找不到帳號。</div>`;
-    return;
-  }
-
-  accountList.innerHTML = list.map(user => `
-    <button class="account-card" onclick="showProfile('${user.id}')">
-      <img class="avatar" src="${user.avatar}" alt="${user.name}" onerror="this.style.visibility='hidden'">
-
-      <div class="account-info">
-        <strong>${user.name}</strong>
-        <span>${user.handle}</span>
-        <p>${escapeHTML(normalizeText(user.bio)).replace(/\n/g, " ")}</p>
-      </div>
-    </button>
-  `).join("");
+  return `
+    <div class="comment-replies">
+      ${comment.replies.map(reply => {
+        const replyUser = getUser(reply.author);
+        return `
+          <div class="comment-reply">
+            <img class="avatar comment-avatar small" src="${replyUser.avatar}" alt="${escapeAttribute(replyUser.name)}">
+            <div class="comment-main">
+              <div class="comment-bubble reply-bubble">
+                <span class="comment-name">${escapeHTML(replyUser.name)}</span>
+                <span class="comment-text">${escapeHTML(reply.text)}</span>
+              </div>
+              <div class="comment-time">${escapeHTML(reply.time || "剛剛")}</div>
+            </div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
 }
 
-function focusComposer() {
-  showHome();
-
-  setTimeout(() => {
-    const composer = document.getElementById("composer");
-    const input = document.getElementById("postInput");
-
-    composer.scrollIntoView({
-      behavior: "smooth",
-      block: "center"
-    });
-
-    setTimeout(() => {
-      input.focus();
-    }, 250);
-  }, 80);
-}
-
-function handleImageUpload(event) {
-  const file = event.target.files[0];
-
-  if (!file) return;
-
-  if (!file.type.startsWith("image/")) {
-    showToast("請選擇圖片檔");
-    return;
-  }
-
-  if (file.size > 4 * 1024 * 1024) {
-    showToast("圖片太大，建議 4MB 以下");
-    event.target.value = "";
-    return;
-  }
-
-  const reader = new FileReader();
-
-  reader.onload = function(e) {
-    selectedImageData = e.target.result;
-    document.getElementById("previewImage").src = selectedImageData;
-    document.getElementById("previewBox").classList.add("show");
-  };
-
-  reader.readAsDataURL(file);
-}
-
-function removePreview() {
-  selectedImageData = "";
-  document.getElementById("imageInput").value = "";
-  document.getElementById("previewImage").src = "";
-  document.getElementById("previewBox").classList.remove("show");
-}
-
-function addPost() {
-  const input = document.getElementById("postInput");
-  const text = normalizeText(input.value);
-
-  if (!text && !selectedImageData) {
-    showToast("先寫一點日常或選一張照片");
-    return;
-  }
-
-  const now = Date.now();
-  const category = selectedImageData ? "media" : guessCategory(text);
-
-  const newPost = {
-    id: now,
-    createdAt: now,
-    author: "kaede",
-    time: "剛剛",
-    text: text || "新增了一張日常照片。",
-    image: selectedImageData,
-    likes: 0,
-    replies: 0,
-    category,
-    reply: {
-      author: "zhihao",
-      text: getYanReply(category)
-    },
-    local: true
-  };
-
-  posts = sortPosts([newPost, ...posts]);
-  saveLocalPosts();
-
-  input.value = "";
-  removePreview();
-
-  renderHomeFeed();
-  showToast("已發布");
-}
-
-function guessCategory(text) {
-  const t = text.toLowerCase();
-
-  if (t.includes("吃醋") || t.includes("男人") || t.includes("別人") || t.includes("靠近")) {
-    return "jealous";
-  }
-
-  if (t.includes("照片") || t.includes("拍") || t.includes("圖片")) {
-    return "media";
-  }
-
-  return "daily";
-}
-
-function getYanReply(category) {
-  const replies = {
-    jealous: "我不喜歡別人靠近妳，這件事不需要再問。",
-    media: "照片可以留，但不要發太多。",
-    daily: "我看到了。"
-  };
-
-  return replies[category] || replies.daily;
-}
-
-function toggleLike(postId, button) {
+function toggleLike(postId) {
   if (likedPostIds.includes(postId)) {
     likedPostIds = likedPostIds.filter(id => id !== postId);
   } else {
     likedPostIds.push(postId);
   }
-
-  saveLikes();
-
-  if (currentView === "home") renderHomeFeed();
-  if (currentView === "profile") renderProfileFeed();
-  if (currentView === "liked") renderLikedFeed();
-  if (currentView === "admin") renderAdminPostSelect();
+  saveJSON(STORAGE_LIKES, likedPostIds);
+  refreshCurrentView();
 }
 
-function deletePost(id) {
-  const ok = confirm("確定要刪除這則紀錄嗎？");
-
-  if (!ok) return;
-
-  posts = posts.filter(post => Number(post.id) !== Number(id));
-  likedPostIds = likedPostIds.filter(postId => Number(postId) !== Number(id));
-
-  saveLocalPosts();
-  saveLikes();
-
-  refreshAllViews();
-
-  if (currentView === "admin") {
-    renderAdminPostSelect();
-  }
-
-  showToast("已刪除");
+function focusComment(postId) {
+  document.getElementById(`commentInput-${postId}`)?.focus();
 }
 
-function showPostMenu(id) {
-  const post = posts.find(item => Number(item.id) === Number(id));
-
-  if (!post) return;
-
-  const choice = prompt("輸入 1：編輯這則貼文\n輸入 2：刪除這則貼文\n輸入 3：取消");
-
-  if (choice === "1") {
-    showAdmin();
-
-    setTimeout(() => {
-      const select = document.getElementById("adminPostSelect");
-
-      if (select) {
-        select.value = String(id);
-        loadAdminEditor();
-      }
-    }, 80);
-  }
-
-  if (choice === "2") {
-    deletePost(id);
+function handleCommentKey(event, postId) {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    submitPostComment(postId);
   }
 }
 
-function showMoreMenu() {
-  const choice = prompt("輸入 1：清空本機新增紀錄\n輸入 2：查看保存說明\n輸入 9：進入管理者模式");
+async function submitPostComment(postId) {
+  const input = document.getElementById(`commentInput-${postId}`);
+  const commentText = normalizeText(input?.value);
 
-  if (choice === "1") {
-    const ok = confirm("確定清空自己新增與管理者修改的紀錄嗎？");
-
-    if (!ok) return;
-
-    posts = sortPosts(defaultPosts.map(post => ({
-      ...post,
-      createdAt: post.createdAt || post.id
-    })));
-
-    likedPostIds = [];
-
-    localStorage.removeItem(STORAGE_POSTS);
-    localStorage.removeItem(STORAGE_LIKES);
-
-    refreshAllViews();
-    showToast("已清空並恢復預設貼文");
-  }
-
-  if (choice === "2") {
-    alert("目前是本機保存，不用資料庫、不花錢。管理者修改、AI 生成貼文、自己新增的貼文與照片只會存在這台手機或這個瀏覽器。");
-  }
-
-  if (choice === "9") {
-    showAdmin();
-  }
-}
-
-function renderAdminPostSelect() {
-  const select = document.getElementById("adminPostSelect");
-
-  if (!select) return;
-
-  posts = sortPosts(posts);
-
-  select.innerHTML = posts.map(post => {
-    const user = getUser(post.author);
-    const label = `${user.name}｜${post.time || "剛剛"}｜${normalizeText(post.text).slice(0, 24)}`;
-
-    return `<option value="${post.id}">${escapeHTML(label)}</option>`;
-  }).join("");
-
-  loadAdminEditor();
-}
-
-function loadAdminEditor() {
-  const select = document.getElementById("adminPostSelect");
-  const editor = document.getElementById("adminEditor");
-
-  if (!select || !editor) return;
-
-  const postId = Number(select.value);
-  const post = posts.find(item => Number(item.id) === postId);
-
-  if (!post) {
-    editor.innerHTML = `<div class="empty">找不到貼文。</div>`;
+  if (!commentText) {
+    showToast("先輸入留言內容");
     return;
   }
 
-  const reply = post.reply || { author: "zhihao", text: "" };
+  const postIndex = posts.findIndex(post => Number(post.id) === Number(postId));
+  if (postIndex === -1) return;
 
-  editor.innerHTML = `
-    <label class="admin-label">發文角色</label>
-    <select class="admin-select" id="adminAuthor">
-      ${Object.values(users).map(user => `
-        <option value="${user.id}" ${post.author === user.id ? "selected" : ""}>${user.name} ${user.handle}</option>
-      `).join("")}
-    </select>
-
-    <label class="admin-label">發文時間文字</label>
-    <input class="admin-input" id="adminTime" value="${escapeAttribute(post.time || "")}">
-
-    <label class="admin-label">貼文內容</label>
-    <textarea class="admin-textarea" id="adminText">${escapeHTML(post.text || "")}</textarea>
-
-    <label class="admin-label">圖片路徑或圖片資料</label>
-    <input class="admin-input" id="adminImage" value="${escapeAttribute(post.image || "")}" placeholder="例如 images/feed/kaede-garden.jpg">
-
-    <div class="admin-file-row">
-      <input type="file" accept="image/*" onchange="handleAdminImageUpload(event)">
-    </div>
-
-    ${
-      post.image
-        ? `
-          <div class="admin-preview">
-            <img src="${post.image}" alt="貼文圖片" onerror="this.parentElement.style.display='none'">
-          </div>
-        `
-        : ""
-    }
-
-    <div class="admin-grid">
-      <div>
-        <label class="admin-label">讚數</label>
-        <input class="admin-input" id="adminLikes" type="number" value="${Number(post.likes || 0)}">
-      </div>
-
-      <div>
-        <label class="admin-label">回覆數</label>
-        <input class="admin-input" id="adminReplies" type="number" value="${Number(post.replies || 0)}">
-      </div>
-    </div>
-
-    <label class="admin-label">分類</label>
-    <select class="admin-select" id="adminCategory">
-      ${["daily", "media", "jealous", "gossip"].map(cat => `
-        <option value="${cat}" ${post.category === cat ? "selected" : ""}>${cat}</option>
-      `).join("")}
-    </select>
-
-    <label class="admin-label">回覆角色</label>
-    <select class="admin-select" id="adminReplyAuthor">
-      ${Object.values(users).map(user => `
-        <option value="${user.id}" ${reply.author === user.id ? "selected" : ""}>${user.name} ${user.handle}</option>
-      `).join("")}
-    </select>
-
-    <label class="admin-label">回覆內容</label>
-    <textarea class="admin-textarea" id="adminReplyText">${escapeHTML(reply.text || "")}</textarea>
-
-    <div class="admin-save-row">
-      <button class="admin-btn dark" onclick="saveAdminPost(${post.id})">儲存修改</button>
-      <button class="admin-btn danger" onclick="deletePost(${post.id})">刪除貼文</button>
-    </div>
-  `;
-}
-
-function saveAdminPost(postId) {
-  const index = posts.findIndex(post => Number(post.id) === Number(postId));
-
-  if (index === -1) return;
-
-  const oldPost = posts[index];
-
-  const updatedPost = {
-    ...oldPost,
-    author: document.getElementById("adminAuthor").value,
-    time: normalizeText(document.getElementById("adminTime").value) || "剛剛",
-    text: normalizeText(document.getElementById("adminText").value),
-    image: document.getElementById("adminImage").value.trim(),
-    likes: Number(document.getElementById("adminLikes").value || 0),
-    replies: Number(document.getElementById("adminReplies").value || 0),
-    category: document.getElementById("adminCategory").value,
-    reply: {
-      author: document.getElementById("adminReplyAuthor").value,
-      text: normalizeText(document.getElementById("adminReplyText").value)
-    },
-    local: true,
-    createdAt: oldPost.createdAt || oldPost.id || Date.now()
+  const post = posts[postIndex];
+  const commentId = Date.now();
+  const comment = {
+    id: commentId,
+    author: "me",
+    text: commentText,
+    time: "剛剛",
+    replies: []
   };
 
-  posts[index] = updatedPost;
-  posts = sortPosts(posts);
-  saveLocalPosts();
+  post.comments.push(comment);
+  post.replies = Number(post.replies || 0) + 1;
+  input.value = "";
+  persistPosts();
+  refreshCurrentView();
 
-  renderAdminPostSelect();
-  refreshAllViews();
+  try {
+    showToast(`${getUser(post.author).name} 正在回覆...`);
+    const response = await fetch("http://localhost:3001/api/comment-reply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        characterId: post.author,
+        characterPrompt: buildCommentPrompt(users[post.author]),
+        characterName: users[post.author].name,
+        postText: post.text,
+        userComment: commentText
+      })
+    });
 
-  showToast("已儲存修改");
-}
-
-function handleAdminImageUpload(event) {
-  const file = event.target.files[0];
-
-  if (!file) return;
-
-  if (!file.type.startsWith("image/")) {
-    showToast("請選擇圖片檔");
-    return;
-  }
-
-  if (file.size > 4 * 1024 * 1024) {
-    showToast("圖片太大，建議 4MB 以下");
-    event.target.value = "";
-    return;
-  }
-
-  const reader = new FileReader();
-
-  reader.onload = function(e) {
-    const imageInput = document.getElementById("adminImage");
-
-    if (imageInput) {
-      imageInput.value = e.target.result;
+    if (!response.ok) {
+      throw new Error(`API ${response.status}`);
     }
 
-    showToast("圖片已放入欄位，記得按儲存修改");
-  };
+    const data = await response.json();
+    const latestPost = posts.find(item => Number(item.id) === Number(postId));
+    const latestComment = latestPost?.comments.find(item => Number(item.id) === Number(commentId));
 
-  reader.readAsDataURL(file);
+    if (latestComment) {
+      latestComment.replies.push({
+        id: Date.now() + 1,
+        author: latestPost.author,
+        text: normalizeText(data.reply) || buildLocalCommentReply(latestPost.author, commentText),
+        time: "剛剛"
+      });
+      latestPost.replies = Number(latestPost.replies || 0) + 1;
+      persistPosts();
+      refreshCurrentView();
+    }
+  } catch (error) {
+    console.warn("comment reply fallback:", error);
+    const latestPost = posts.find(item => Number(item.id) === Number(postId));
+    const latestComment = latestPost?.comments.find(item => Number(item.id) === Number(commentId));
+
+    if (latestComment) {
+      latestComment.replies.push({
+        id: Date.now() + 1,
+        author: latestPost.author,
+        text: buildLocalCommentReply(latestPost.author, commentText),
+        time: "剛剛"
+      });
+      latestPost.replies = Number(latestPost.replies || 0) + 1;
+      persistPosts();
+      refreshCurrentView();
+    }
+  }
 }
 
-function createBlankPost() {
+function buildLocalCommentReply(authorId, commentText) {
+  const topic = extractTopic(commentText);
+  const replies = {
+    kaede: [`你這樣說我會害羞啦。`, `我才沒有那麼好懂……但你說得也不是完全錯。`],
+    zhihao: [`這不是你需要操心的事。`, `她的事，我會處理。`],
+    xiayan: [`我就說吧，這件事真的很明顯。`, `你很懂，我喜歡。`],
+    shuxian: [`我知道，可是想到${topic}還是會在意。`, `你這樣講，我好像有比較冷靜一點。`],
+    youchen: [`不是不回，是不知道怎麼說。`, `我有看到，也有在想。`],
+    minjun: [`如果是我，我不會讓你等這麼久。`, `這句話我收下了。`],
+    staff: [`匿名帳號只敢說：懂的都懂。`, `這留言我截圖了，但我會保命。`]
+  };
+  return pick(replies[authorId] || replies.kaede);
+}
+
+function addPost() {
+  const input = document.getElementById("postInput");
+  const text = normalizeText(input.value);
+  if (!text) {
+    showToast("先寫一點內容");
+    return;
+  }
+
   const now = Date.now();
-
-  const newPost = {
+  posts.unshift({
     id: now,
     createdAt: now,
     author: "kaede",
     time: "剛剛",
-    text: "新的日常紀錄。",
+    text,
     image: "",
     likes: 0,
     replies: 0,
-    category: "daily",
-    reply: {
-      author: "zhihao",
-      text: "我看到了。"
-    },
-    local: true
-  };
-
-  posts = sortPosts([newPost, ...posts]);
-  saveLocalPosts();
-
-  renderAdminPostSelect();
-  refreshAllViews();
-
-  showToast("已新增空白貼文");
+    comments: []
+  });
+  input.value = "";
+  persistPosts();
+  renderHomeFeed();
+  showToast("已發布動態");
 }
 
-function generateAIPost() {
-  const generated = buildAIPost();
-  posts = sortPosts([generated, ...posts]);
-
-  saveLocalPosts();
-  renderAdminPostSelect();
-  refreshAllViews();
-
-  showToast("AI 已生成一則角色貼文");
+function focusComposer() {
+  showHome();
+  setTimeout(() => document.getElementById("postInput")?.focus(), 120);
 }
 
-function autoGenerateDays() {
-  const count = Math.random() > 0.5 ? 1 : 2;
+function renderSearch() {
+  const keyword = normalizeText(document.getElementById("searchInput")?.value).toLowerCase();
+  const list = Object.values(users).filter(user => user.id !== "me").filter(user => {
+    const content = `${user.name} ${user.handle} ${user.bio} ${(user.tags || []).join(" ")}`.toLowerCase();
+    return content.includes(keyword);
+  });
+  const accountList = document.getElementById("accountList");
+  accountList.innerHTML = list.map(user => `
+    <button class="account-card" onclick="showProfile('${user.id}')">
+      <img class="avatar" src="${user.avatar}" alt="${escapeAttribute(user.name)}">
+      <div class="account-info">
+        <strong>${escapeHTML(user.name)}</strong>
+        <span>${escapeHTML(user.handle)}</span>
+        <p>${escapeHTML(user.bio)}</p>
+      </div>
+    </button>
+  `).join("") || `<div class="empty">找不到角色。</div>`;
+}
 
-  for (let i = 0; i < count; i++) {
-    const generated = buildAIPost(Date.now() + i + 1);
-    generated.time = i === 0 ? "1 天前" : "2 天前";
-    generated.createdAt = Date.now() - ((i + 1) * 86400000);
-    posts.push(generated);
+function renderMessages() {
+  const contacts = Object.values(users).filter(user => user.id !== "me" && user.id !== "kaede");
+  const currentUser = getUser(currentChatUser);
+  const conversation = getConversation(currentChatUser);
+
+  document.getElementById("conversationList").innerHTML = contacts.map(user => `
+    <button class="conversation-card ${user.id === currentChatUser ? "active" : ""}" onclick="openConversation('${user.id}')">
+      <img src="${user.avatar}" alt="${escapeAttribute(user.name)}">
+      <span>${escapeHTML(user.name)}</span>
+    </button>
+  `).join("");
+
+  document.getElementById("chatHeader").innerHTML = `
+    <img src="${currentUser.avatar}" alt="${escapeAttribute(currentUser.name)}">
+    <div class="chat-title">
+      <strong>${escapeHTML(currentUser.name)}</strong>
+      <span>${escapeHTML(currentUser.handle)} · API 角色聊天</span>
+    </div>
+  `;
+
+  document.getElementById("chatLog").innerHTML = conversation.map(item => `
+    <div class="message ${item.role === "me" ? "me" : "them"}">${formatMessageHTML(item.text)}</div>
+  `).join("");
+
+  const log = document.getElementById("chatLog");
+  log.scrollTop = log.scrollHeight;
+}
+
+function getConversation(userId) {
+  if (!messages[userId]) {
+    messages[userId] = [{ role: "them", text: getOpeningLine(userId) }];
+    saveJSON(STORAGE_MESSAGES, messages);
+  }
+  return messages[userId];
+}
+
+function openConversation(userId) {
+  currentChatUser = userId;
+  renderMessages();
+}
+
+function handleMessageKey(event) {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    sendMessage();
+  }
+}
+
+async function sendMessage() {
+  const input = document.getElementById("messageInput");
+  const text = normalizeText(input.value);
+  if (!text) {
+    showToast("先輸入訊息");
+    return;
   }
 
-  posts = sortPosts(posts);
-  saveLocalPosts();
+  const conversation = getConversation(currentChatUser);
+  conversation.push({ role: "me", text });
+  input.value = "";
+  saveJSON(STORAGE_MESSAGES, messages);
+  renderMessages();
+  setChatStatus(`${getUser(currentChatUser).name} 正在輸入...`);
 
-  renderAdminPostSelect();
-  refreshAllViews();
+  const reply = await createCharacterReply(currentChatUser, text, {
+    mode: "dm",
+    history: conversation.slice(-10)
+  });
 
-  showToast(`已模擬 ${count} 則隔日角色貼文`);
+  conversation.push({ role: "them", text: reply });
+  saveJSON(STORAGE_MESSAGES, messages);
+  setChatStatus("");
+  renderMessages();
 }
 
-function buildAIPost(customId = Date.now()) {
-  const templates = [
-    {
-      author: "kaede",
-      category: "daily",
-      image: "images/feed/kaede-garden.jpg",
-      textList: [
-        "今天在花園澆花，裙角不小心沾到一點水。嚴志豪看見後沒有說話，只是把傘往我這邊偏了一點。",
-        "我只是多看了一眼甜點櫃，嚴志豪就叫人全部包起來。很誇張，可是我還是有點開心。",
-        "今天穿了新的日式洋裝。嚴志豪看了三秒，然後只說：外套穿上。"
-      ],
-      replyAuthor: "zhihao",
-      replyList: [
-        "下次不要站在風口。",
-        "喜歡就買，不需要猶豫。",
-        "不是管妳，是妳太容易讓人分心。"
-      ]
-    },
-    {
-      author: "zhihao",
-      category: "daily",
-      image: "images/feed/zhihao-office.jpg",
-      textList: [
-        "她今天來公司，整層樓都比平常吵。",
-        "會議提前結束。不是因為她，是因為效率太低。",
-        "甜點買了。她如果說不想吃，也只是現在不想。"
-      ],
-      replyAuthor: "kaede",
-      replyList: [
-        "你明明就是想早點陪我！",
-        "你不要把想見我講得那麼像工作檢討啦。",
-        "我才沒有那麼好猜……吧。"
-      ]
-    },
-    {
-      author: "xiayan",
-      category: "jealous",
-      image: "images/feed/xiayan-cafe.jpg",
-      textList: [
-        "西島楓說嚴志豪只是比較關心她。我看那不是關心，那是移動式監控系統。",
-        "如果嚴志豪再用『安全』兩個字包裝控制慾，我真的會笑出來。",
-        "今天陪西島楓喝咖啡，她手機亮了八次，八次都是同一個人。"
-      ],
-      replyAuthor: "kaede",
-      replyList: [
-        "妳不要講得好像他很可怕啦……",
-        "可是他有時候真的只是擔心我。",
-        "我沒有一直看手機！"
-      ]
-    },
-    {
-      author: "staff",
-      category: "gossip",
-      image: "images/feed/staff-office.jpg",
-      textList: [
-        "匿名觀察：理事長太太一出現，理事長今天的低氣壓下降了百分之三十。",
-        "今日西江建設未解之謎：理事長明明說不提前下班，五分鐘後人已經在電梯裡。",
-        "理事長太太今天笑著跟大家打招呼，理事長站在後面，表情像在審核所有人的視線。"
-      ],
-      replyAuthor: "zhihao",
-      replyList: [
-        "匿名不代表安全。",
-        "工作時間少看八卦。",
-        "明天資訊部門開會。"
-      ]
-    },
-    {
-      author: "shuxian",
-      category: "daily",
-      image: "images/feed/shuxian-night.jpg",
-      textList: [
-        "冷戰真的很煩。尤其是對方明明在線，卻假裝沒有看到。",
-        "西島楓叫我不要先低頭。可是我覺得她自己遇到嚴志豪也做不到。",
-        "有些人不說想念，只會問妳吃飯了沒。"
-      ],
-      replyAuthor: "youchen",
-      replyList: [
-        "我有看到。",
-        "不是假裝。",
-        "妳先吃飯。"
-      ]
-    },
-    {
-      author: "minjun",
-      category: "jealous",
-      image: "images/feed/minjun-dessert.jpg",
-      textList: [
-        "甜點店的燈很適合她。可惜有人總是把她看得太緊。",
-        "偶然遇見西島楓。她選甜點的樣子，比櫥窗裡的東西更引人注意。",
-        "有些花就算被養在玻璃溫室裡，也還是會讓路過的人停下來看。"
-      ],
-      replyAuthor: "zhihao",
-      replyList: [
-        "路過就繼續走。",
-        "你看得太久了。",
-        "離她遠一點。"
-      ]
-    }
-  ];
+async function createCharacterReply(userId, text, context) {
+  const user = getUser(userId);
+  const prompt = buildDMNovelPrompt(user);
 
-  const template = templates[Math.floor(Math.random() * templates.length)];
-  const text = template.textList[Math.floor(Math.random() * template.textList.length)];
-  const replyText = template.replyList[Math.floor(Math.random() * template.replyList.length)];
+  try {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        characterId: userId,
+        characterName: user.name,
+        prompt,
+        openMode,
+        message: text,
+        context
+      })
+    });
 
+    if (!response.ok) throw new Error(`API ${response.status}`);
+    const data = await response.json();
+    return normalizeText(data.reply) || buildLocalCommentReply(userId, text);
+  } catch (error) {
+    console.warn("chat fallback:", error);
+    return buildLocalCommentReply(userId, text);
+  }
+}
+
+function getOpeningLine(userId) {
   return {
-    id: customId,
-    createdAt: customId,
-    author: template.author,
-    time: "剛剛",
-    text,
-    image: template.image,
-    likes: Math.floor(Math.random() * 900) + 60,
-    replies: Math.floor(Math.random() * 90) + 8,
-    category: template.category,
-    reply: {
-      author: template.replyAuthor,
-      text: replyText
-    },
-    local: true
-  };
+    zhihao: "有事就說，我在。",
+    xiayan: "說，誰惹你。",
+    shuxian: "你也睡不著嗎？",
+    youchen: "嗯，我在。",
+    minjun: "這麼晚找我？",
+    staff: "匿名帳號上線，先說我只是路過。"
+  }[userId] || "我在。";
 }
 
-function resetAllPosts() {
-  const ok = confirm("確定要重置全部貼文嗎？這會清除管理者修改與 AI 生成貼文。");
-
-  if (!ok) return;
-
-  posts = sortPosts(defaultPosts.map(post => ({
-    ...post,
-    createdAt: post.createdAt || post.id
-  })));
-
-  likedPostIds = [];
-
-  localStorage.removeItem(STORAGE_POSTS);
-  localStorage.removeItem(STORAGE_LIKES);
-
-  renderAdminPostSelect();
-  refreshAllViews();
-
-  showToast("已重置全部貼文");
+function extractTopic(text) {
+  return normalizeText(text).split(/[，。！？\s]+/).filter(Boolean).sort((a, b) => b.length - a.length)[0] || "這件事";
 }
 
-function refreshAllViews() {
+function pick(list) {
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function setChatStatus(text) {
+  document.getElementById("chatStatus").textContent = text;
+}
+
+function renderPromptSelect() {
+  const select = document.getElementById("promptUserSelect");
+  select.innerHTML = Object.values(users)
+    .filter(user => user.id !== "me")
+    .map(user => `<option value="${user.id}">${escapeHTML(user.name)} ${escapeHTML(user.handle)}</option>`)
+    .join("");
+  select.value = currentChatUser || "zhihao";
+  loadPromptEditor();
+}
+
+function loadPromptEditor() {
+  const userId = document.getElementById("promptUserSelect").value;
+  document.getElementById("promptText").value = characterPrompts[userId] || buildCommentPrompt(getUser(userId));
+  document.getElementById("openModeToggle").checked = openMode;
+}
+
+function savePromptEditor() {
+  const userId = document.getElementById("promptUserSelect").value;
+  characterPrompts[userId] = normalizeText(document.getElementById("promptText").value);
+  openMode = document.getElementById("openModeToggle").checked;
+  saveJSON(STORAGE_PROMPTS, characterPrompts);
+  localStorage.setItem(STORAGE_OPEN_MODE, String(openMode));
+  showToast("已儲存 prompt");
+}
+
+async function checkApiStatus() {
+  const status = document.getElementById("apiStatus");
+  status.textContent = "檢查中...";
+  try {
+    const response = await fetch("http://localhost:3001/api/health");
+    const data = await response.json();
+    status.textContent = data.openaiConfigured ? "API 已設定，可以使用 AI 角色聊天與留言回覆。" : "尚未設定 OPENAI_API_KEY。";
+  } catch {
+    status.textContent = "目前連不到 localhost:3001，請先啟動 server.js。";
+  }
+}
+
+function persistPosts() {
+  saveJSON(STORAGE_POSTS, posts);
+}
+
+function refreshCurrentView() {
   if (currentView === "home") renderHomeFeed();
-
-  if (currentView === "profile") {
-    renderProfile();
-    renderProfileFeed();
-  }
-
+  if (currentView === "profile") renderProfileFeed();
   if (currentView === "liked") renderLikedFeed();
-
-  if (currentView === "admin") {
-    renderHomeFeed();
-    renderProfile();
-    renderProfileFeed();
-    renderLikedFeed();
-  }
 }
 
 function showToast(message) {
   const toast = document.getElementById("toast");
-
   toast.textContent = message;
   toast.classList.add("show");
-
-  setTimeout(() => {
-    toast.classList.remove("show");
-  }, 1600);
+  setTimeout(() => toast.classList.remove("show"), 1800);
 }
 
-function escapeHTML(str) {
-  return String(str || "").replace(/[&<>"']/g, function(match) {
-    const escapeMap = {
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#039;"
-    };
-
-    return escapeMap[match];
-  });
+function escapeHTML(value) {
+  return String(value || "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#039;"
+  }[char]));
 }
 
-function escapeAttribute(str) {
-  return String(str || "")
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+function escapeAttribute(value) {
+  return escapeHTML(value).replace(/`/g, "&#096;");
 }
 
-renderProfile();
-renderProfileFeed();
+function formatMessageHTML(value) {
+  return escapeHTML(value)
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+    .replace(/\n/g, "<br>");
+}
+
+showHome();

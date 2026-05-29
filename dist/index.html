@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>角色動態</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <button class="topbar-left" id="backBtn" onclick="goBack()" style="display:none;">‹</button>
+      <div class="topbar-title" id="topbarTitle">動態</div>
+      <button class="topbar-right" onclick="showAdmin()">⋯</button>
+    </header>
+
+    <section class="view active" id="homeView">
+      <section class="composer" id="composer">
+        <img class="avatar" src="images/kaede.jpg" alt="西島楓">
+        <div class="composer-main">
+          <div class="composer-name">西島楓</div>
+          <textarea id="postInput" placeholder="今天想發什麼動態？"></textarea>
+          <div class="composer-bottom">
+            <button class="tool-btn" onclick="showToast('圖片功能保留中')">📷</button>
+            <button class="post-btn" onclick="addPost()">發布</button>
+          </div>
+        </div>
+      </section>
+      <section class="feed" id="homeFeed"></section>
+    </section>
+
+    <section class="view" id="profileView">
+      <section class="profile" id="profileArea"></section>
+      <nav class="tabs">
+        <button class="tab active" onclick="setProfileTab('posts', this)">貼文</button>
+        <button class="tab" onclick="setProfileTab('replies', this)">回覆</button>
+      </nav>
+      <section class="feed" id="profileFeed"></section>
+    </section>
+
+    <section class="view" id="searchView">
+      <div class="search-page">
+        <input class="search-box" id="searchInput" type="text" placeholder="搜尋角色" oninput="renderSearch()">
+        <div class="account-list" id="accountList"></div>
+      </div>
+    </section>
+
+    <section class="view" id="messagesView">
+      <div class="messages-page">
+        <aside class="conversation-list" id="conversationList"></aside>
+        <section class="chat-panel">
+          <div class="chat-header" id="chatHeader"></div>
+          <div class="chat-log" id="chatLog"></div>
+          <div class="chat-status" id="chatStatus"></div>
+          <div class="chat-composer">
+            <textarea id="messageInput" placeholder="輸入私訊..." onkeydown="handleMessageKey(event)"></textarea>
+            <button class="post-btn" onclick="sendMessage()">傳送</button>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="view" id="likedView">
+      <section class="feed" id="likedFeed"></section>
+    </section>
+
+    <section class="view" id="adminView">
+      <div class="admin-page">
+        <div class="admin-header">
+          <div>
+            <h2>管理者模式</h2>
+            <p>調整角色 prompt、開放模式與 API 行為。</p>
+          </div>
+          <button class="admin-small-btn" onclick="showHome()">離開</button>
+        </div>
+
+        <div class="admin-card">
+          <label class="admin-label">角色</label>
+          <select class="admin-input" id="promptUserSelect" onchange="loadPromptEditor()"></select>
+
+          <label class="admin-label">角色 prompt</label>
+          <textarea class="admin-textarea prompt-textarea" id="promptText"></textarea>
+
+          <label class="switch-row">
+            <input id="openModeToggle" type="checkbox">
+            <span>開放模式：允許更長、更有張力的角色回覆</span>
+          </label>
+
+          <button class="admin-btn dark" onclick="savePromptEditor()">儲存 prompt</button>
+        </div>
+
+        <div class="admin-card">
+          <h3>API 狀態</h3>
+          <p id="apiStatus">尚未檢查</p>
+          <button class="admin-btn" onclick="checkApiStatus()">檢查 API</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav">
+    <button class="nav-item active" id="navHome" onclick="showHome()" aria-label="動態">⌂</button>
+    <button class="nav-item" id="navSearch" onclick="showSearch()" aria-label="搜尋">⌕</button>
+    <button class="nav-item add" onclick="focusComposer()" aria-label="新增貼文">＋</button>
+    <button class="nav-item" id="navMessages" onclick="showMessages()" aria-label="私訊">✉</button>
+    <button class="nav-item" id="navLiked" onclick="showLiked()" aria-label="喜歡">♡</button>
+    <button class="nav-item profile-nav" id="navProfile" onclick="showProfile('kaede')" aria-label="個人頁">
+      <img src="images/kaede.jpg" alt="西島楓">
+    </button>
+  </nav>
+
+  <div class="toast" id="toast">提示</div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

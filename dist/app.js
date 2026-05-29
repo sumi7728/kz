@@ -4,19 +4,24 @@ const STORAGE_MESSAGES = "jz_messages_v1";
 const STORAGE_PROMPTS = "jz_prompts_v1";
 const STORAGE_OPEN_MODE = "jz_open_mode_v1";
 
+const appUsers = window.users || {};
+const appDefaultPosts = window.defaultPosts || [];
+const appBuildDMNovelPrompt = window.buildDMNovelPrompt;
+const appBuildCommentPrompt = window.buildCommentPrompt;
+
 let currentView = "home";
 let previousView = "home";
 let currentProfileUser = "kaede";
 let currentProfileTab = "posts";
 let currentChatUser = "zhihao";
 
-let posts = normalizePosts(loadJSON(STORAGE_POSTS, defaultPosts));
+let posts = normalizePosts(loadJSON(STORAGE_POSTS, appDefaultPosts));
 let likedPostIds = loadJSON(STORAGE_LIKES, []);
 let messages = loadJSON(STORAGE_MESSAGES, {});
 let savedCharacterPrompts = loadJSON(STORAGE_PROMPTS, {});
-let characterPrompts = Object.fromEntries(Object.values(users).map(user => [
+let characterPrompts = Object.fromEntries(Object.values(appUsers).map(user => [
   user.id,
-  savedCharacterPrompts[user.id] || buildCommentPrompt(user)
+  savedCharacterPrompts[user.id] || appBuildCommentPrompt(user)
 ]));
 let openMode = localStorage.getItem(STORAGE_OPEN_MODE) === "true";
 
@@ -66,7 +71,7 @@ function normalizeText(value) {
 }
 
 function getUser(id) {
-  return users[id] || users.me || users.kaede;
+  return appUsers[id] || appUsers.me || appUsers.kaede;
 }
 
 function setActiveView(viewId) {
@@ -387,8 +392,8 @@ async function submitPostComment(postId) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         characterId: post.author,
-        characterPrompt: buildCommentPrompt(users[post.author]),
-        characterName: users[post.author].name,
+        characterPrompt: appBuildCommentPrompt(appUsers[post.author]),
+        characterName: appUsers[post.author].name,
         postText: post.text,
         userComment: commentText
       })
@@ -479,7 +484,7 @@ function focusComposer() {
 
 function renderSearch() {
   const keyword = normalizeText(document.getElementById("searchInput")?.value).toLowerCase();
-  const list = Object.values(users).filter(user => user.id !== "me").filter(user => {
+  const list = Object.values(appUsers).filter(user => user.id !== "me").filter(user => {
     const content = `${user.name} ${user.handle} ${user.bio} ${(user.tags || []).join(" ")}`.toLowerCase();
     return content.includes(keyword);
   });
@@ -497,7 +502,7 @@ function renderSearch() {
 }
 
 function renderMessages() {
-  const contacts = Object.values(users).filter(user => user.id !== "me" && user.id !== "kaede");
+  const contacts = Object.values(appUsers).filter(user => user.id !== "me" && user.id !== "kaede");
   const currentUser = getUser(currentChatUser);
   const conversation = getConversation(currentChatUser);
 
@@ -572,7 +577,7 @@ async function sendMessage() {
 
 async function createCharacterReply(userId, text, context) {
   const user = getUser(userId);
-  const prompt = buildDMNovelPrompt(user);
+  const prompt = appBuildDMNovelPrompt(user);
 
   try {
     const response = await fetch("/api/chat", {
@@ -622,7 +627,7 @@ function setChatStatus(text) {
 
 function renderPromptSelect() {
   const select = document.getElementById("promptUserSelect");
-  select.innerHTML = Object.values(users)
+  select.innerHTML = Object.values(appUsers)
     .filter(user => user.id !== "me")
     .map(user => `<option value="${user.id}">${escapeHTML(user.name)} ${escapeHTML(user.handle)}</option>`)
     .join("");
@@ -632,7 +637,7 @@ function renderPromptSelect() {
 
 function loadPromptEditor() {
   const userId = document.getElementById("promptUserSelect").value;
-  document.getElementById("promptText").value = characterPrompts[userId] || buildCommentPrompt(getUser(userId));
+  document.getElementById("promptText").value = characterPrompts[userId] || appBuildCommentPrompt(getUser(userId));
   document.getElementById("openModeToggle").checked = openMode;
 }
 

@@ -498,8 +498,10 @@ function buildCharacterPrompt(user) {
   return buildCommentPrompt(user);
 }
 
-window.users = users;
-window.defaultPosts = defaultPosts;
-window.buildDMNovelPrompt = buildDMNovelPrompt;
-window.buildCommentPrompt = buildCommentPrompt;
-window.buildCharacterPrompt = buildCharacterPrompt;
+export {
+  users,
+  defaultPosts,
+  buildCharacterPrompt,
+  buildDMNovelPrompt,
+  buildCommentPrompt
+};

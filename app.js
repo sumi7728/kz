@@ -10,13 +10,16 @@ const STORAGE_LIKES = "jz_likes_v1";
 const STORAGE_MESSAGES = "jz_messages_v1";
 const STORAGE_PROMPTS = "jz_prompts_v1";
 const STORAGE_OPEN_MODE = "jz_open_mode_v1";
+const STORAGE_CHAT_MODEL = "jz_chat_model_v1";
 const browserStorage = typeof localStorage !== "undefined" ? localStorage : null;
+const CHAT_MODELS = ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini"];
 
 let currentView = "home";
 let previousView = "home";
 let currentProfileUser = "kaede";
 let currentProfileTab = "posts";
 let currentChatUser = "zhihao";
+let currentChatModel = browserStorage?.getItem(STORAGE_CHAT_MODEL) || "gpt-4o";
 
 let posts = normalizePosts(loadJSON(STORAGE_POSTS, defaultPosts));
 let likedPostIds = loadJSON(STORAGE_LIKES, []);
@@ -508,6 +511,9 @@ function renderMessages() {
   const contacts = Object.values(users).filter(user => user.id !== "me" && user.id !== "kaede");
   const currentUser = getUser(currentChatUser);
   const conversation = getConversation(currentChatUser);
+  const modelOptions = CHAT_MODELS.map(model => `
+    <option value="${model}" ${model === currentChatModel ? "selected" : ""}>${model}</option>
+  `).join("");
 
   document.getElementById("conversationList").innerHTML = contacts.map(user => `
     <button class="conversation-card ${user.id === currentChatUser ? "active" : ""}" onclick="openConversation('${user.id}')">
@@ -520,8 +526,14 @@ function renderMessages() {
     <img src="${currentUser.avatar}" alt="${escapeAttribute(currentUser.name)}">
     <div class="chat-title">
       <strong>${escapeHTML(currentUser.name)}</strong>
-      <span>${escapeHTML(currentUser.handle)} · API 角色聊天</span>
+      <span>${escapeHTML(currentUser.handle)} · Render API</span>
     </div>
+    <label class="model-picker">
+      <span>模型</span>
+      <select id="modelSelect" onchange="setChatModel(this.value)">
+        ${modelOptions}
+      </select>
+    </label>
   `;
 
   document.getElementById("chatLog").innerHTML = conversation.map(item => `
@@ -543,6 +555,11 @@ function getConversation(userId) {
 function openConversation(userId) {
   currentChatUser = userId;
   renderMessages();
+}
+
+function setChatModel(model) {
+  currentChatModel = CHAT_MODELS.includes(model) ? model : "gpt-4o";
+  browserStorage?.setItem(STORAGE_CHAT_MODEL, currentChatModel);
 }
 
 function handleMessageKey(event) {
@@ -589,6 +606,7 @@ async function createCharacterReply(userId, text, context) {
       body: JSON.stringify({
         characterId: userId,
         characterName: user.name,
+        model: currentChatModel,
         prompt,
         openMode,
         message: text,
@@ -655,7 +673,7 @@ function savePromptEditor() {
 
 async function checkApiStatus() {
   const status = document.getElementById("apiStatus");
-  status.textContent = "部署到 Vercel 後，/api/chat 與 /api/comment-reply 會讀取 Vercel 環境變數 OPENAI_API_KEY。";
+  status.textContent = "部署到 Render 後，/api/chat 與 /api/comment-reply 會讀取 Render Environment Variables 裡的 OPENAI_API_KEY。";
 }
 
 function persistPosts() {
@@ -710,6 +728,7 @@ if (typeof window !== "undefined") {
     renderSearch,
     savePromptEditor,
     sendMessage,
+    setChatModel,
     setProfileTab,
     showAdmin,
     showHome,

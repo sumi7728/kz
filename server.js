@@ -1,66 +1,38 @@
-const http = require("http");
-const fs = require("fs");
+const express = require("express");
 const path = require("path");
 
-try {
-  require("dotenv").config();
-} catch {
-  loadEnvFile();
-}
+require("dotenv").config();
 
+const app = express();
 const PORT = Number(process.env.PORT || 3001);
 const ROOT = __dirname;
-const CHAT_MODEL = process.env.OPENAI_MODEL || "gpt-4o";
+const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-4o";
+const ALLOWED_MODELS = new Set([
+  "gpt-4o",
+  "gpt-4o-mini",
+  "gpt-4.1",
+  "gpt-4.1-mini"
+]);
 
-const mimeTypes = {
-  ".html": "text/html; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".js": "text/javascript; charset=utf-8",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".png": "image/png",
-  ".webp": "image/webp"
-};
-
-const server = http.createServer(async (req, res) => {
-  setCorsHeaders(res);
-
-  if (req.method === "OPTIONS") {
-    res.writeHead(204);
-    res.end();
-    return;
+app.use(express.json({ limit: "1mb" }));
+app.use(express.static(ROOT, {
+  extensions: ["html"],
+  setHeaders(res, filePath) {
+    if (filePath.endsWith(".js")) {
+      res.setHeader("Content-Type", "text/javascript; charset=utf-8");
+    }
   }
+}));
 
-  const url = new URL(req.url, `http://${req.headers.host}`);
-
-  if (req.method === "GET" && url.pathname === "/api/health") {
-    sendJSON(res, 200, {
-      ok: true,
-      openaiConfigured: Boolean(process.env.OPENAI_API_KEY),
-      model: CHAT_MODEL
-    });
-    return;
-  }
-
-  if (req.method === "POST" && url.pathname === "/api/comment-reply") {
-    await handleCommentReply(req, res);
-    return;
-  }
-
-  if (req.method === "POST" && url.pathname === "/api/chat") {
-    await handleChat(req, res);
-    return;
-  }
-
-  if (req.method !== "GET") {
-    sendJSON(res, 405, { error: "Method not allowed" });
-    return;
-  }
-
-  serveStatic(url.pathname, res);
+app.get("/api/health", (_req, res) => {
+  res.json({
+    ok: true,
+    openaiConfigured: Boolean(process.env.OPENAI_API_KEY),
+    defaultModel: DEFAULT_MODEL
+  });
 });
 
-async function handleCommentReply(req, res) {
+app.post("/api/comment-reply", async (req, res) => {
   try {
     const {
       characterId,
@@ -68,17 +40,17 @@ async function handleCommentReply(req, res) {
       characterName,
       postText,
       userComment
-    } = await readJSON(req);
+    } = req.body || {};
 
-    const response = await createOpenAIResponse({
-      model: "gpt-4o",
+    const reply = await createOpenAIResponse({
+      model: DEFAULT_MODEL,
       instructions: `
 ${characterPrompt || ""}
 
 你現在不是在普通聊天，而是在 Instagram 風格的角色貼文底下回覆留言。
 
 規則：
-- 你是「${characterName || characterId}」，請用這個角色的語氣回覆。
+- 你是「${characterName || characterId || "角色"}」，請用這個角色的語氣回覆。
 - 回覆要像 IG 留言，不要太長。
 - 1 到 3 句即可。
 - 可以有曖昧、吐槽、吃醋、護短、冷淡、撒嬌等角色感。
@@ -93,42 +65,38 @@ ${postText || ""}
 使用者留言：
 ${userComment || ""}
 
-請用「${characterName || characterId}」的語氣回覆這則留言。
+請用「${characterName || characterId || "角色"}」的語氣回覆這則留言。
       `,
       max_output_tokens: 160
     });
 
-    sendJSON(res, 200, {
-      reply: response
-    });
+    res.json({ reply });
   } catch (error) {
-    console.error(error);
-    sendJSON(res, 500, {
-      error: "角色留言回覆失敗"
-    });
+    console.error("comment reply failed:", error);
+    res.status(500).json({ error: "角色留言回覆失敗" });
   }
-}
+});
 
-async function handleChat(req, res) {
+app.post("/api/chat", async (req, res) => {
   try {
-    const body = await readJSON(req);
-    const response = await createOpenAIResponse({
-      model: CHAT_MODEL,
+    const body = req.body || {};
+    const reply = await createOpenAIResponse({
+      model: selectModel(body.model),
       instructions: buildChatInstructions(body),
       input: buildChatInput(body),
-      max_output_tokens: 220
+      max_output_tokens: 260
     });
 
-    sendJSON(res, 200, {
-      reply: response
-    });
+    res.json({ reply });
   } catch (error) {
-    console.error(error);
-    sendJSON(res, 500, {
-      error: "角色聊天失敗"
-    });
+    console.error("chat failed:", error);
+    res.status(500).json({ error: "角色聊天失敗" });
   }
-}
+});
+
+app.get("*", (_req, res) => {
+  res.sendFile(path.join(ROOT, "index.html"));
+});
 
 async function createOpenAIResponse(payload) {
   if (!process.env.OPENAI_API_KEY) {
@@ -153,24 +121,31 @@ async function createOpenAIResponse(payload) {
   return extractResponseText(data);
 }
 
+function selectModel(model) {
+  return ALLOWED_MODELS.has(model) ? model : DEFAULT_MODEL;
+}
+
 function buildChatInstructions(body) {
   return [
-    body.prompt || `你正在扮演 ${body.characterName || "角色"}。`,
-    "請嚴格遵守上方 prompt 的格式、角色限制與互動規則。",
-    "不要替使用者說話，不要解釋角色設定，不要出現 AI 自我說明。"
+    body.prompt || `你正在扮演：${body.characterName || "角色"}`,
+    "你正在進行沉浸式小說角色扮演。",
+    "你不是客服，不是旁白機器，也不是普通聊天 AI。",
+    "使用繁體中文。旁白、動作、心理描寫使用斜體字；角色說話使用粗體字。",
+    "一次只回一小段，不要推進太多劇情。",
+    "不要替使用者說話，不要自行加入重大事件，不要解釋角色設定。"
   ].join("\n");
 }
 
 function buildChatInput(body) {
-  const history = Array.isArray(body.context?.history) ? body.context.history.slice(-8) : [];
+  const history = Array.isArray(body.context?.history) ? body.context.history.slice(-10) : [];
   const historyText = history
-    .map(item => `${item.role === "me" ? "使用者" : body.characterName}: ${item.text}`)
+    .map(item => `${item.role === "me" ? "使用者" : body.characterName || "角色"}：${item.text}`)
     .join("\n");
 
   return [
     historyText ? `最近對話：\n${historyText}` : "",
-    `使用者最新訊息：${body.message || ""}`,
-    "請用角色口吻回覆。"
+    `使用者訊息：\n${body.message || ""}`,
+    `請用「${body.characterName || "角色"}」的語氣自然回覆。`
   ].filter(Boolean).join("\n\n");
 }
 
@@ -191,85 +166,6 @@ function extractResponseText(data) {
   return chunks.join("").trim();
 }
 
-function readJSON(req) {
-  return new Promise((resolve, reject) => {
-    let raw = "";
-    req.on("data", chunk => {
-      raw += chunk;
-      if (raw.length > 100000) {
-        reject(new Error("Request body too large"));
-        req.destroy();
-      }
-    });
-    req.on("end", () => {
-      try {
-        resolve(raw ? JSON.parse(raw) : {});
-      } catch {
-        reject(new Error("Invalid JSON"));
-      }
-    });
-    req.on("error", reject);
-  });
-}
-
-function serveStatic(pathname, res) {
-  const safePath = pathname === "/" ? "/index.html" : decodeURIComponent(pathname);
-  const filePath = path.join(ROOT, safePath);
-
-  if (!filePath.startsWith(ROOT)) {
-    res.writeHead(403);
-    res.end("Forbidden");
-    return;
-  }
-
-  fs.readFile(filePath, (error, content) => {
-    if (error) {
-      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
-      res.end("Not found");
-      return;
-    }
-
-    res.writeHead(200, {
-      "Content-Type": mimeTypes[path.extname(filePath).toLowerCase()] || "application/octet-stream"
-    });
-    res.end(content);
-  });
-}
-
-function setCorsHeaders(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-}
-
-function sendJSON(res, status, data) {
-  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
-  res.end(JSON.stringify(data));
-}
-
-function loadEnvFile() {
-  const envPath = path.join(__dirname, ".env");
-
-  if (!fs.existsSync(envPath)) {
-    return;
-  }
-
-  const lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/);
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
-
-    const index = trimmed.indexOf("=");
-    const key = trimmed.slice(0, index).trim();
-    const value = trimmed.slice(index + 1).trim().replace(/^["']|["']$/g, "");
-
-    if (key) {
-      process.env[key] = value;
-    }
-  }
-}
-
-server.listen(PORT, () => {
-  console.log(`JZ app running at http://localhost:${PORT}`);
+app.listen(PORT, () => {
+  console.log(`JZ app running on port ${PORT}`);
 });

@@ -536,6 +536,11 @@ button {
   border-bottom: 1px solid var(--line);
 }
 
+.chat-title {
+  min-width: 0;
+  flex: 1;
+}
+
 .chat-title strong,
 .chat-title span {
   display: block;
@@ -545,6 +550,27 @@ button {
   margin-top: 2px;
   color: var(--sub);
   font-size: 12px;
+}
+
+.model-picker {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  align-items: center;
+  color: var(--sub);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.model-picker select {
+  height: 34px;
+  max-width: 140px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text);
+  padding: 0 10px;
+  outline: none;
 }
 
 .chat-log {

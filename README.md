@@ -1,38 +1,40 @@
-# 角色動態 App
+# 夢糖庭院
 
-## Vercel 部署
+粉白軟萌風格的 OC 互動社群平台。玩家可以建立自己的 OC、發文留言、和 AI 角色私訊，也可以申請專屬 AI 角色。
 
-這是純靜態前端搭配 Vercel API Routes 的專案。
-
-Vercel 設定：
+## Render 設定
 
 ```text
-Build Command: npm run build
-Output Directory: dist
+Build Command: npm install
+Start Command: npm start
 ```
 
-API routes：
+## Environment Variables
+
+請在 Render 的 Environment Variables 設定：
 
 ```text
-/api/chat
-/api/comment-reply
+OPENAI_API_KEY=你的 OpenAI API Key
+OPENAI_MODEL=gpt-5.2
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=你的 Supabase service role key
+SUPABASE_AVATAR_BUCKET=avatars
 ```
 
-## 環境變數
+`.env` 不要上傳 GitHub，範例請看 `.env.example`。
 
-請在 Vercel Project Settings 裡設定：
+## Supabase
+
+第一次部署前，請到 Supabase SQL Editor 執行 `supabase-schema.sql`。
+
+注意：目前的 schema 會先 drop 舊表再重建，會清空既有資料。
+
+## 最高權限帳號
+
+註冊帳號時使用：
 
 ```text
-OPENAI_API_KEY=你的 OpenAI API key
-OPENAI_MODEL=gpt-4o
+kaede_728
 ```
 
-不要把 `.env` 上傳 GitHub；本專案已用 `.gitignore` 排除 `.env`。
-
-## 本機建置
-
-```powershell
-npm run build
-```
-
-輸出會在 `dist/`。
+這個帳號會成為唯一最高權限管理者。其他帳號都會是普通玩家。

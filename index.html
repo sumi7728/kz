@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Threads OC</title>
+  <title>夢糖庭院</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -11,22 +11,23 @@
   <main class="app-shell">
     <header class="topbar">
       <button class="icon-btn back-btn" id="backBtn" onclick="goBack()" aria-label="返回" style="display:none;">‹</button>
-      <div class="brand" id="topbarTitle">Threads OC</div>
+      <div class="brand" id="topbarTitle">夢糖庭院</div>
       <button class="text-btn" id="authBtn" onclick="showAuth()">登入</button>
     </header>
 
     <section class="view active" id="homeView">
+      <section class="status-card" id="connectionCard"></section>
       <section class="composer">
-        <img class="avatar" id="composerAvatar" src="images/kaede.jpg" alt="玩家頭貼">
+        <img class="avatar" id="composerAvatar" src="images/kaede.jpg" alt="目前角色">
         <div class="composer-body">
           <div class="composer-name" id="composerName">西島楓</div>
           <div class="mention-wrap">
-            <textarea id="postInput" placeholder="開始串文吧。輸入 @ 可以標記角色，沒標記時預設使用你的角色。" oninput="handlePostInput()" onkeydown="handlePostKey(event)"></textarea>
+            <textarea id="postInput" placeholder="訪客只能瀏覽。登入並建立 OC 後，就能在夢糖庭院發文。" oninput="handlePostInput()" onkeydown="handlePostKey(event)"></textarea>
             <div class="mention-menu" id="mentionMenu"></div>
           </div>
           <div class="composer-actions">
-            <button class="ghost-btn" onclick="refreshRemoteData()">重新整理</button>
-            <button class="primary-btn" onclick="addPost()">發布</button>
+            <button class="ghost-btn" onclick="refreshRemoteData()">刷新花園</button>
+            <button class="primary-btn" onclick="addPost()">發佈</button>
           </div>
         </div>
       </section>
@@ -35,8 +36,8 @@
 
     <section class="view" id="searchView">
       <div class="panel">
-        <input class="search-box" id="searchInput" type="text" placeholder="搜尋帳號、角色或 OC" oninput="renderSearch()">
-        <div class="account-list" id="accountList"></div>
+        <input class="search-box" id="searchInput" type="text" placeholder="搜尋玩家帳號、OC 或 AI 角色" oninput="renderSearch()">
+        <div id="accountList"></div>
       </div>
     </section>
 
@@ -48,7 +49,7 @@
           <div class="chat-log" id="chatLog"></div>
           <div class="chat-status" id="chatStatus"></div>
           <div class="chat-composer">
-            <textarea id="messageInput" placeholder="輸入私訊..." onkeydown="handleMessageKey(event)"></textarea>
+            <textarea id="messageInput" placeholder="輸入訊息..." onkeydown="handleMessageKey(event)"></textarea>
             <button class="primary-btn" onclick="sendMessage()">送出</button>
           </div>
         </section>
@@ -58,7 +59,7 @@
     <section class="view" id="profileView">
       <section class="profile" id="profileArea"></section>
       <nav class="tabs">
-        <button class="tab active" onclick="setProfileTab('posts', this)">串文</button>
+        <button class="tab active" onclick="setProfileTab('posts', this)">貼文</button>
         <button class="tab" onclick="setProfileTab('replies', this)">回覆</button>
       </nav>
       <section class="feed" id="profileFeed"></section>
@@ -67,15 +68,15 @@
     <section class="view" id="authView">
       <div class="panel form-panel">
         <h1 id="authTitle">登入</h1>
-        <p class="muted">登入後可以儲存並更新自己的 OC。未登入時預設玩家是西島楓。</p>
+        <p class="muted">訪客只能看貼文。註冊後請先建立自己的 OC，之後才能發文、留言與 AI 角色聊天。</p>
         <label>帳號</label>
-        <input class="field" id="authUsername" autocomplete="username" placeholder="例如 kaede_player">
+        <input class="field" id="authUsername" autocomplete="username" placeholder="最高權限帳號請用 kaede_728">
         <label>密碼</label>
         <input class="field" id="authPassword" type="password" autocomplete="current-password">
-        <label class="register-only">暱稱</label>
+        <label class="register-only">顯示名稱</label>
         <input class="field register-only" id="authDisplayName" placeholder="例如 小楓">
         <button class="primary-btn wide" onclick="submitAuth()">送出</button>
-        <button class="ghost-btn wide" onclick="toggleAuthMode()" id="authToggle">還沒有帳號？註冊</button>
+        <button class="ghost-btn wide" onclick="toggleAuthMode()" id="authToggle">沒有帳號？註冊</button>
       </div>
     </section>
 
@@ -83,40 +84,83 @@
       <div class="panel form-panel">
         <div class="section-head">
           <div>
-            <h1>我的 OC</h1>
-            <p class="muted">註冊並建立 OC 後，首頁、右下角個人資料和預設發文身份都會改成你的 OC。</p>
+            <h1>我的小庭院</h1>
+            <p class="muted">設定你的玩家 OC、AI 記憶，以及申請專屬 AI 角色。</p>
           </div>
           <button class="ghost-btn" onclick="logout()" id="logoutBtn">登出</button>
         </div>
 
+        <section class="settings-card admin-only" id="adminPanel" style="display:none;">
+          <h2>管理者模式</h2>
+          <p class="muted">只有 @kaede_728 可以開啟。可以刪除貼文、留言，並審核玩家提出的 AI 角色申請。</p>
+          <div class="account-list" id="adminRequestList"></div>
+        </section>
+
         <section class="settings-card">
-          <h2>玩家資料</h2>
-          <label>暱稱</label>
-          <input class="field" id="profileNameInput" placeholder="你的暱稱">
+          <h2>帳號資料</h2>
+          <label>顯示名稱</label>
+          <input class="field" id="profileNameInput" placeholder="你的名稱">
           <label>頭貼</label>
           <input class="field file-input" id="profileAvatarInput" type="file" accept="image/*">
-          <button class="primary-btn" onclick="saveProfile()">儲存玩家資料</button>
+          <button class="primary-btn" onclick="saveProfile()">儲存帳號資料</button>
         </section>
 
         <section class="settings-card">
           <h2>建立 / 更新 OC</h2>
-          <label>角色名稱</label>
-          <input class="field" id="ocNameInput" placeholder="例如 霧島凜">
+          <label>角色名字</label>
+          <input class="field" id="ocNameInput" placeholder="例如 凜">
           <label>@帳號</label>
-          <input class="field" id="ocHandleInput" placeholder="例如 rin，發文可輸入 @rin">
+          <input class="field" id="ocHandleInput" placeholder="例如 rin">
           <label>性格</label>
-          <textarea class="field area" id="ocPersonalityInput" placeholder="例如 嘴硬、護短、吃醋但不承認。"></textarea>
+          <textarea class="field area" id="ocPersonalityInput" placeholder="例如 嘴硬、敏感、容易心軟，但不會直接承認。"></textarea>
           <label>外表</label>
-          <textarea class="field area" id="ocAppearanceInput" placeholder="例如 黑髮、冷白皮、常穿深色外套。"></textarea>
-          <label>說話方式</label>
-          <textarea class="field area" id="ocSpeakingInput" placeholder="例如 短句、低聲、只回一句。"></textarea>
+          <textarea class="field area" id="ocAppearanceInput" placeholder="例如 黑髮、眼尾微挑、穿搭乾淨。"></textarea>
+          <label>說話風格</label>
+          <textarea class="field area" id="ocSpeakingInput" placeholder="例如 短句、會反問、偶爾撒嬌。"></textarea>
           <label>角色頭貼</label>
           <input class="field file-input" id="ocAvatarInput" type="file" accept="image/*">
           <button class="primary-btn" onclick="createOC()">儲存 OC</button>
         </section>
 
         <section class="settings-card">
-          <h2>目前角色</h2>
+          <h2>AI 角色記憶</h2>
+          <p class="muted">設定「你和某個 AI 角色」之間的專屬記憶，會用在私訊和 @ 該角色回覆時。</p>
+          <label>AI 角色</label>
+          <select class="field" id="aiSettingCharacterSelect" onchange="loadAISettingForm()"></select>
+          <label>重要記憶</label>
+          <textarea class="field area tall-area" id="aiMemoryInput" placeholder="例如 他要記得我討厭被敷衍、喜歡被叫某個暱稱。"></textarea>
+          <label>互動模式</label>
+          <textarea class="field area" id="aiModeInput" placeholder="例如 慢熱曖昧、嘴硬拉扯、像小說互動，不要客服感。"></textarea>
+          <label>稱呼</label>
+          <input class="field" id="aiNicknameInput" placeholder="例如 叫我小楓、太太、主人等">
+          <label>不可違規規則</label>
+          <textarea class="field area" id="aiRulesInput" placeholder="例如 不可以替我說話、不可以崩角色、不可以突然加入重大事件。"></textarea>
+          <button class="primary-btn" onclick="saveAISetting()">儲存 AI 記憶</button>
+        </section>
+
+        <section class="settings-card">
+          <h2>申請專屬 AI 角色</h2>
+          <p class="muted">普通玩家可以提出申請，審核後再加入正式 AI 角色池。</p>
+          <label>AI 角色名字</label>
+          <input class="field" id="requestAINameInput" placeholder="例如 白栞">
+          <label>@帳號</label>
+          <input class="field" id="requestAIHandleInput" placeholder="例如 shiori">
+          <label>角色概念</label>
+          <textarea class="field area" id="requestAIConceptInput" placeholder="這個角色是誰？和你的 OC 怎麼互動？"></textarea>
+          <label>性格</label>
+          <textarea class="field area" id="requestAIPersonalityInput"></textarea>
+          <label>外表</label>
+          <textarea class="field area" id="requestAIAppearanceInput"></textarea>
+          <label>說話風格</label>
+          <textarea class="field area" id="requestAISpeakingInput"></textarea>
+          <label>角色規則</label>
+          <textarea class="field area" id="requestAIPromptInput" placeholder="不可崩壞設定、互動邊界、稱呼規則等。"></textarea>
+          <button class="primary-btn" onclick="submitAIRequest()">送出申請</button>
+          <div class="account-list" id="myAIRequestList"></div>
+        </section>
+
+        <section class="settings-card">
+          <h2>我的角色</h2>
           <div class="account-list" id="myOCList"></div>
         </section>
       </div>
@@ -127,7 +171,7 @@
     <button class="nav-item active" id="navHome" onclick="showHome()" aria-label="首頁">⌂</button>
     <button class="nav-item" id="navSearch" onclick="showSearch()" aria-label="搜尋">⌕</button>
     <button class="nav-item add" onclick="focusComposer()" aria-label="新增">＋</button>
-    <button class="nav-item" id="navMessages" onclick="showMessages()" aria-label="私訊">✉</button>
+    <button class="nav-item" id="navMessages" onclick="showMessages()" aria-label="訊息">✉</button>
     <button class="nav-item profile-nav" id="navProfile" onclick="showPlayerProfile()" aria-label="個人資料">
       <img id="navProfileAvatar" src="images/kaede.jpg" alt="個人資料">
     </button>

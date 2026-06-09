@@ -79,6 +79,8 @@ button {
 
 .topbar-right {
   right: 0;
+  font-size: 14px;
+  font-weight: 900;
 }
 
 .view {
@@ -118,16 +120,56 @@ button {
   font-weight: 900;
 }
 
-.composer-select {
-  width: 100%;
-  height: 38px;
-  margin-top: 8px;
+.mention-wrap {
+  position: relative;
+}
+
+.mention-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 40;
+  display: none;
+  overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.12);
+}
+
+.mention-menu.show {
+  display: grid;
+}
+
+.mention-menu button {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.mention-menu button:hover {
   background: var(--soft);
-  padding: 0 12px;
-  outline: none;
-  font-weight: 800;
+}
+
+.mention-menu img {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.mention-menu span {
+  display: grid;
+  gap: 2px;
+}
+
+.mention-menu small,
+.mention {
+  color: #246bfe;
+  font-weight: 850;
 }
 
 .composer textarea {
@@ -273,6 +315,36 @@ button {
   display: grid;
   gap: 12px;
   margin-top: 12px;
+}
+
+.comments {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.comment {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.comment-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.comment-head {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  font-size: 13px;
+}
+
+.comment-head span,
+.reply-head span {
+  color: var(--sub);
+  font-size: 12px;
 }
 
 .comment-item,
@@ -732,7 +804,7 @@ button {
   width: min(100%, 520px);
   height: 62px;
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   transform: translateX(-50%);
   background: rgba(255, 255, 255, 0.94);
   border-top: 1px solid var(--line);

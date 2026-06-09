@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OC 社群</title>
+  <title>角色社群</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -20,10 +20,12 @@
         <img class="avatar" id="composerAvatar" src="images/kaede.jpg" alt="我的頭貼">
         <div class="composer-main">
           <div class="composer-name" id="composerName">匿名玩家</div>
-          <select class="composer-select" id="postCharacterSelect"></select>
-          <textarea id="postInput" placeholder="寫一則動態，並標記一個 OC..."></textarea>
+          <div class="mention-wrap">
+            <textarea id="postInput" placeholder="發一則動態，輸入 @ 可以標記角色。沒標記時預設 @kaede 西島楓。" oninput="handlePostInput()" onkeydown="handlePostKey(event)"></textarea>
+            <div class="mention-menu" id="mentionMenu"></div>
+          </div>
           <div class="composer-bottom">
-            <button class="tool-btn" onclick="refreshRemoteData()">重新整理</button>
+            <button class="tool-btn" onclick="refreshRemoteData()" title="重新整理">↻</button>
             <button class="post-btn" onclick="addPost()">發布</button>
           </div>
         </div>
@@ -67,7 +69,7 @@
         <div class="admin-header">
           <div>
             <h2>我的設定與 OC</h2>
-            <p>設定匿名暱稱、頭貼，建立可以被貼文標記的角色。</p>
+            <p>設定匿名暱稱、頭貼，建立可以被 @ 標記的角色。</p>
           </div>
           <button class="admin-small-btn" onclick="showHome()">回動態</button>
         </div>
@@ -76,10 +78,8 @@
           <h3>匿名身分</h3>
           <label class="admin-label">暱稱</label>
           <input class="admin-input" id="profileNameInput" placeholder="例如：小楓">
-
           <label class="admin-label">頭貼</label>
           <input class="admin-input file-input" id="profileAvatarInput" type="file" accept="image/*">
-
           <button class="admin-btn dark" onclick="saveProfile()">儲存身分</button>
         </div>
 
@@ -87,19 +87,16 @@
           <h3>建立我的角色 OC</h3>
           <label class="admin-label">角色名稱</label>
           <input class="admin-input" id="ocNameInput" placeholder="例如：霧島凜">
-
+          <label class="admin-label">帳號</label>
+          <input class="admin-input" id="ocHandleInput" placeholder="例如：rin，發文時可 @rin">
           <label class="admin-label">性格</label>
           <textarea class="admin-textarea" id="ocPersonalityInput" placeholder="例如：嘴硬、護短、很會吃醋，但不會直接承認。"></textarea>
-
           <label class="admin-label">外表</label>
           <textarea class="admin-textarea" id="ocAppearanceInput" placeholder="例如：黑髮、冷白皮、常穿深色外套。"></textarea>
-
           <label class="admin-label">說話方式</label>
           <textarea class="admin-textarea" id="ocSpeakingInput" placeholder="例如：短句、低聲、偶爾毒舌，只回一句。"></textarea>
-
           <label class="admin-label">角色頭貼</label>
           <input class="admin-input file-input" id="ocAvatarInput" type="file" accept="image/*">
-
           <button class="admin-btn dark" onclick="createOC()">新增 OC</button>
         </div>
 

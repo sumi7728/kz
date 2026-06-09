@@ -1,8 +1,4 @@
-import {
-  users,
-  defaultPosts,
-  buildDMNovelPrompt
-} from "./data.js";
+import { users, defaultPosts, buildDMNovelPrompt } from "./data.js";
 
 const STORAGE_USER_ID = "jz_user_id";
 const STORAGE_PROFILE = "jz_profile";
@@ -10,10 +6,11 @@ const STORAGE_MESSAGES = "jz_messages_v1";
 const STORAGE_CHAT_MODEL = "jz_chat_model_v1";
 const browserStorage = typeof localStorage !== "undefined" ? localStorage : null;
 const CHAT_MODELS = ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini"];
+const DEFAULT_CHARACTER_ID = "kaede";
 
 let currentView = "home";
 let previousView = "home";
-let currentProfileUser = "kaede";
+let currentProfileUser = DEFAULT_CHARACTER_ID;
 let currentProfileTab = "posts";
 let currentChatUser = "zhihao";
 let currentChatModel = browserStorage?.getItem(STORAGE_CHAT_MODEL) || "gpt-4o";
@@ -23,6 +20,7 @@ let profiles = {};
 let characters = {};
 let posts = [];
 let remoteReady = false;
+let mentionQuery = "";
 let currentProfile = loadJSON(STORAGE_PROFILE, null) || {
   id: getOrCreateUserId(),
   display_name: "匿名玩家",
@@ -50,8 +48,8 @@ const baseCharacters = Object.fromEntries(
 initializeApp();
 
 async function initializeApp() {
-  renderUserShell();
   hydrateFallbackData();
+  renderUserShell();
   await saveProfile({ silent: true });
   await refreshRemoteData({ silent: true });
   showHome();
@@ -82,20 +80,20 @@ function hydrateFallbackData() {
   profiles[currentProfile.id] = currentProfile;
   characters = { ...baseCharacters };
   posts = defaultPosts.map(post => ({
-    id: post.id,
+    id: String(post.id),
     author_id: currentProfile.id,
-    character_id: post.author,
+    character_id: post.author || DEFAULT_CHARACTER_ID,
     text: post.text,
-    image_url: post.image,
-    created_at: new Date(Date.now() - Number(post.id || 1) * 1000).toISOString(),
+    image_url: post.image || "",
+    created_at: new Date(Date.now() - Number(post.id || 1) * 120000).toISOString(),
     comments: (post.comments || []).map(comment => ({
-      id: comment.id,
+      id: String(comment.id),
       author_id: currentProfile.id,
       text: comment.text,
       created_at: new Date().toISOString(),
       replies: (comment.replies || []).map(reply => ({
-        id: reply.id,
-        character_id: reply.author,
+        id: String(reply.id),
+        character_id: reply.author || post.author || DEFAULT_CHARACTER_ID,
         text: reply.text,
         created_at: new Date().toISOString()
       }))
@@ -133,11 +131,12 @@ async function refreshRemoteData(options = {}) {
 }
 
 function normalizeCharacter(character) {
+  const handle = normalizeHandle(character.handle || character.name || "oc");
   return {
     id: character.id,
     owner_id: character.owner_id,
-    name: character.name,
-    handle: `@oc_${String(character.name || "oc").toLowerCase()}`,
+    name: character.name || "未命名 OC",
+    handle: `@${handle}`,
     avatar_url: character.avatar_url || "images/kaede.jpg",
     bio: [character.personality, character.appearance].filter(Boolean).join(" / "),
     personality: character.personality || "",
@@ -151,22 +150,22 @@ function normalizeCharacter(character) {
 
 function normalizePost(post) {
   return {
-    id: post.id,
+    id: String(post.id),
     author_id: post.author_id,
-    character_id: post.character_id,
-    text: post.text,
+    character_id: post.character_id || DEFAULT_CHARACTER_ID,
+    text: post.text || "",
     image_url: post.image_url || "",
-    created_at: post.created_at,
+    created_at: post.created_at || new Date().toISOString(),
     comments: (post.comments || []).map(comment => ({
-      id: comment.id,
+      id: String(comment.id),
       author_id: comment.author_id,
-      text: comment.text,
-      created_at: comment.created_at,
+      text: comment.text || "",
+      created_at: comment.created_at || new Date().toISOString(),
       replies: (comment.replies || []).map(reply => ({
-        id: reply.id,
+        id: String(reply.id),
         character_id: reply.character_id,
-        text: reply.text,
-        created_at: reply.created_at
+        text: reply.text || "",
+        created_at: reply.created_at || new Date().toISOString()
       }))
     }))
   };
@@ -180,33 +179,11 @@ function renderUserShell() {
   if (avatar) avatar.src = currentProfile.avatar_url || "images/kaede.jpg";
   if (name) name.textContent = currentProfile.display_name || "匿名玩家";
   if (profileNameInput) profileNameInput.value = currentProfile.display_name || "";
-  renderCharacterSelect();
   renderMyOCList();
 }
 
-function renderCharacterSelect() {
-  const select = document.getElementById("postCharacterSelect");
-  if (!select) return;
-
-  const options = getPostableCharacters();
-  select.innerHTML = options.map(character => `
-    <option value="${character.id}">標記 ${escapeHTML(character.name)}</option>
-  `).join("");
-}
-
-function getPostableCharacters() {
-  const all = Object.values(characters);
-  const owned = all.filter(character => character.owner_id === currentProfile.id);
-  return owned.length ? owned : all.filter(character => character.isBase).slice(0, 6);
-}
-
 function getCharacter(id) {
-  return characters[id] || baseCharacters[id] || Object.values(characters)[0] || {
-    id: "unknown",
-    name: "未設定角色",
-    avatar_url: "images/kaede.jpg",
-    handle: "@unknown"
-  };
+  return characters[id] || baseCharacters[id] || baseCharacters[DEFAULT_CHARACTER_ID];
 }
 
 function getProfile(id) {
@@ -215,6 +192,28 @@ function getProfile(id) {
     display_name: "匿名玩家",
     avatar_url: "images/kaede.jpg"
   };
+}
+
+function getAllCharacters() {
+  return Object.values(characters).sort((a, b) => {
+    if (a.isBase && !b.isBase) return -1;
+    if (!a.isBase && b.isBase) return 1;
+    return a.name.localeCompare(b.name, "zh-Hant");
+  });
+}
+
+function getCharacterByHandle(handle) {
+  const normalized = normalizeHandle(handle);
+  return getAllCharacters().find(character => normalizeHandle(character.handle) === normalized);
+}
+
+function getMentionedCharacter(text) {
+  const matches = [...String(text || "").matchAll(/@([a-zA-Z0-9_\-\u4e00-\u9fff]+)/g)];
+  for (const match of matches) {
+    const character = getCharacterByHandle(match[1]);
+    if (character) return character;
+  }
+  return getCharacter(DEFAULT_CHARACTER_ID);
 }
 
 function setActiveView(viewId) {
@@ -242,13 +241,13 @@ function showHome() {
   scrollToTop();
 }
 
-function showProfile(userId) {
+function showProfile(characterId) {
   previousView = currentView;
   currentView = "profile";
-  currentProfileUser = userId;
+  currentProfileUser = characterId;
   currentProfileTab = "posts";
   setActiveView("profileView");
-  setTopbar(getCharacter(userId).name, true);
+  setTopbar(getCharacter(characterId).name, true);
   setNav("Search");
   renderProfile();
   renderProfileFeed();
@@ -265,10 +264,10 @@ function showSearch() {
   scrollToTop();
 }
 
-function showMessages(userId = currentChatUser) {
+function showMessages(characterId = currentChatUser) {
   previousView = currentView;
   currentView = "messages";
-  currentChatUser = userId;
+  currentChatUser = characterId;
   setActiveView("messagesView");
   setTopbar("私訊", true);
   setNav("Messages");
@@ -371,16 +370,16 @@ function renderPost(post) {
             <strong>${escapeHTML(character.name)}</strong>
             <span>${escapeHTML(character.handle || "@oc")} · ${formatTime(post.created_at)}</span>
           </div>
-          <div class="tagged-by">由 ${escapeHTML(author.display_name)} 標記</div>
+          <div class="tagged-by">由 ${escapeHTML(author.display_name)} 發布</div>
         </div>
         <button class="more" onclick="showMessages('${character.id}')">私訊</button>
       </header>
-      <p class="post-text">${escapeHTML(post.text)}</p>
+      <p class="post-text">${linkMentions(post.text)}</p>
       ${post.image_url ? `<img class="post-image" src="${post.image_url}" alt="">` : ""}
       <div class="actions">
         <button class="action ${liked ? "liked" : ""}" onclick="toggleLike('${post.id}')">${liked ? "♥" : "♡"}</button>
         <button class="action" onclick="focusComment('${post.id}')">💬</button>
-        <button class="action" onclick="showToast('已複製分享感')">↗</button>
+        <button class="action" onclick="showToast('已分享')">↗</button>
       </div>
       <div class="count">${post.comments.length} 則留言</div>
       <div class="comments">${renderComments(post)}</div>
@@ -459,6 +458,7 @@ async function submitPostComment(postId) {
     created_at: new Date().toISOString(),
     replies: []
   };
+
   post.comments.push(tempComment);
   input.value = "";
   refreshCurrentView();
@@ -495,9 +495,9 @@ async function submitPostComment(postId) {
 async function addPost() {
   const input = document.getElementById("postInput");
   const text = normalizeText(input.value);
-  const characterId = document.getElementById("postCharacterSelect")?.value;
   if (!text) return showToast("先寫一點內容");
-  if (!characterId) return showToast("請先建立或選擇 OC");
+
+  const character = getMentionedCharacter(text);
 
   try {
     const response = await fetch("/api/posts", {
@@ -505,7 +505,7 @@ async function addPost() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         authorId: currentProfile.id,
-        characterId,
+        characterId: character.id,
         text
       })
     });
@@ -513,24 +513,76 @@ async function addPost() {
     const data = await response.json();
     posts.unshift(normalizePost(data.post));
     input.value = "";
+    closeMentionMenu();
     renderHomeFeed();
-    showToast("已發布到共享動態");
+    showToast(`已用 ${character.handle} 發布`);
     await refreshRemoteData({ silent: true });
   } catch (error) {
     console.warn("post fallback:", error);
     posts.unshift({
       id: `local_${Date.now()}`,
       author_id: currentProfile.id,
-      character_id: characterId,
+      character_id: character.id,
       text,
       image_url: "",
       created_at: new Date().toISOString(),
       comments: []
     });
     input.value = "";
+    closeMentionMenu();
     renderHomeFeed();
     showToast("Supabase 尚未連線，暫存在本機畫面");
   }
+}
+
+function handlePostInput() {
+  const input = document.getElementById("postInput");
+  const text = input.value.slice(0, input.selectionStart);
+  const match = text.match(/@([a-zA-Z0-9_\-\u4e00-\u9fff]*)$/);
+  if (!match) return closeMentionMenu();
+  mentionQuery = match[1].toLowerCase();
+  renderMentionMenu();
+}
+
+function handlePostKey(event) {
+  if (event.key === "Escape") closeMentionMenu();
+}
+
+function renderMentionMenu() {
+  const menu = document.getElementById("mentionMenu");
+  const matches = getAllCharacters()
+    .filter(character => {
+      const content = `${character.handle} ${character.name}`.toLowerCase();
+      return content.includes(mentionQuery);
+    })
+    .slice(0, 8);
+
+  if (!matches.length) return closeMentionMenu();
+  menu.innerHTML = matches.map(character => `
+    <button type="button" onclick="insertMention('${character.id}')">
+      <img src="${character.avatar_url}" alt="${escapeAttribute(character.name)}">
+      <span><strong>${escapeHTML(character.name)}</strong><small>${escapeHTML(character.handle)}</small></span>
+    </button>
+  `).join("");
+  menu.classList.add("show");
+}
+
+function insertMention(characterId) {
+  const input = document.getElementById("postInput");
+  const character = getCharacter(characterId);
+  const startText = input.value.slice(0, input.selectionStart).replace(/@([a-zA-Z0-9_\-\u4e00-\u9fff]*)$/, `${character.handle} `);
+  const endText = input.value.slice(input.selectionStart);
+  input.value = startText + endText;
+  input.focus();
+  input.selectionStart = input.selectionEnd = startText.length;
+  closeMentionMenu();
+}
+
+function closeMentionMenu() {
+  const menu = document.getElementById("mentionMenu");
+  if (!menu) return;
+  menu.classList.remove("show");
+  menu.innerHTML = "";
 }
 
 function focusComposer() {
@@ -543,21 +595,13 @@ async function saveProfile(options = {}) {
   const fileInput = document.getElementById("profileAvatarInput");
   const displayName = normalizeText(nameInput?.value || currentProfile.display_name) || "匿名玩家";
   const avatarDataUrl = fileInput?.files?.[0] ? await fileToDataUrl(fileInput.files[0]) : "";
-
-  currentProfile = {
-    ...currentProfile,
-    display_name: displayName
-  };
+  currentProfile = { ...currentProfile, display_name: displayName };
 
   try {
     const response = await fetch("/api/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: currentProfile.id,
-        displayName,
-        avatarDataUrl
-      })
+      body: JSON.stringify({ userId: currentProfile.id, displayName, avatarDataUrl })
     });
     if (!response.ok) throw new Error(`API ${response.status}`);
     const data = await response.json();
@@ -572,6 +616,7 @@ async function saveProfile(options = {}) {
     if (!options.silent) showToast("身分已儲存");
   } catch (error) {
     console.warn("profile fallback:", error);
+    profiles[currentProfile.id] = currentProfile;
     saveJSON(STORAGE_PROFILE, currentProfile);
     renderUserShell();
     if (!options.silent) showToast("本機已儲存，Supabase 尚未連線");
@@ -580,11 +625,13 @@ async function saveProfile(options = {}) {
 
 async function createOC() {
   const name = normalizeText(document.getElementById("ocNameInput")?.value);
+  const handle = normalizeHandle(document.getElementById("ocHandleInput")?.value || name);
   const personality = normalizeText(document.getElementById("ocPersonalityInput")?.value);
   const appearance = normalizeText(document.getElementById("ocAppearanceInput")?.value);
   const speakingStyle = normalizeText(document.getElementById("ocSpeakingInput")?.value);
   const file = document.getElementById("ocAvatarInput")?.files?.[0];
   if (!name) return showToast("請輸入 OC 名稱");
+  if (!handle) return showToast("請輸入可用帳號");
 
   const avatarDataUrl = file ? await fileToDataUrl(file) : "";
 
@@ -595,6 +642,7 @@ async function createOC() {
       body: JSON.stringify({
         ownerId: currentProfile.id,
         name,
+        handle,
         personality,
         appearance,
         speakingStyle,
@@ -606,7 +654,7 @@ async function createOC() {
     characters[data.character.id] = normalizeCharacter(data.character);
     clearOCForm();
     renderUserShell();
-    showToast("OC 已建立");
+    showToast(`OC 已建立：@${handle}`);
   } catch (error) {
     console.warn("oc fallback:", error);
     const id = `local_oc_${Date.now()}`;
@@ -614,7 +662,7 @@ async function createOC() {
       id,
       owner_id: currentProfile.id,
       name,
-      handle: `@oc_${name}`,
+      handle: `@${handle}`,
       avatar_url: avatarDataUrl || "images/kaede.jpg",
       bio: [personality, appearance].filter(Boolean).join(" / "),
       personality,
@@ -630,7 +678,7 @@ async function createOC() {
 }
 
 function clearOCForm() {
-  ["ocNameInput", "ocPersonalityInput", "ocAppearanceInput", "ocSpeakingInput"].forEach(id => {
+  ["ocNameInput", "ocHandleInput", "ocPersonalityInput", "ocAppearanceInput", "ocSpeakingInput"].forEach(id => {
     const element = document.getElementById(id);
     if (element) element.value = "";
   });
@@ -656,7 +704,7 @@ function renderMyOCList() {
 
 function renderSearch() {
   const keyword = normalizeText(document.getElementById("searchInput")?.value).toLowerCase();
-  const list = Object.values(characters).filter(character => {
+  const list = getAllCharacters().filter(character => {
     const content = `${character.name} ${character.handle} ${character.bio}`.toLowerCase();
     return content.includes(keyword);
   });
@@ -674,8 +722,8 @@ function renderSearch() {
 }
 
 function renderMessages() {
-  const contacts = Object.values(characters);
-  if (!characters[currentChatUser]) currentChatUser = contacts[0]?.id || "zhihao";
+  const contacts = getAllCharacters();
+  if (!characters[currentChatUser]) currentChatUser = contacts[0]?.id || DEFAULT_CHARACTER_ID;
   const currentCharacter = getCharacter(currentChatUser);
   const conversation = getConversation(currentChatUser);
   const modelOptions = CHAT_MODELS.map(model => `
@@ -747,11 +795,7 @@ async function sendMessage() {
   renderMessages();
   setChatStatus(`${character.name} 正在輸入...`);
 
-  const reply = await createCharacterReply(character, text, {
-    mode: "dm",
-    history: conversation.slice(-10)
-  });
-
+  const reply = await createCharacterReply(character, text, { history: conversation.slice(-10) });
   conversation.push({ role: "them", text: reply });
   saveJSON(STORAGE_MESSAGES, messages);
   setChatStatus("");
@@ -759,9 +803,7 @@ async function sendMessage() {
 }
 
 async function createCharacterReply(character, text, context) {
-  const prompt = character.isBase
-    ? buildDMNovelPrompt(users[character.id])
-    : buildOCDMPrompt(character);
+  const prompt = character.isBase ? buildDMNovelPrompt(users[character.id]) : buildOCDMPrompt(character);
 
   try {
     const response = await fetch("/api/chat", {
@@ -809,7 +851,7 @@ function setChatStatus(text) {
 
 function buildLocalCommentReply(characterId) {
   const character = getCharacter(characterId);
-  return `${character.name} 輕輕挑眉，只回了一句：「這句我記住了。」`;
+  return `${character.name} 只回了一句：「這句我記住了。」`;
 }
 
 function refreshCurrentView() {
@@ -831,10 +873,19 @@ function normalizeText(value) {
   return String(value || "").replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+function normalizeHandle(value) {
+  return String(value || "")
+    .replace(/^@/, "")
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/[^\w\-\u4e00-\u9fff]/g, "")
+    .toLowerCase();
+}
+
 function formatTime(value) {
   if (!value) return "剛剛";
   const diff = Date.now() - new Date(value).getTime();
-  if (diff < 60000) return "剛剛";
+  if (Number.isNaN(diff) || diff < 60000) return "剛剛";
   if (diff < 3600000) return `${Math.floor(diff / 60000)} 分鐘前`;
   if (diff < 86400000) return `${Math.floor(diff / 3600000)} 小時前`;
   return `${Math.floor(diff / 86400000)} 天前`;
@@ -847,6 +898,10 @@ function fileToDataUrl(file) {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+function linkMentions(value) {
+  return escapeHTML(value).replace(/@([a-zA-Z0-9_\-\u4e00-\u9fff]+)/g, "<span class=\"mention\">@$1</span>");
 }
 
 function escapeHTML(value) {
@@ -879,6 +934,9 @@ if (typeof window !== "undefined") {
     goBack,
     handleCommentKey,
     handleMessageKey,
+    handlePostInput,
+    handlePostKey,
+    insertMention,
     openConversation,
     refreshRemoteData,
     renderSearch,

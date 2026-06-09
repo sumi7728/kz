@@ -10,7 +10,7 @@ const scrypt = promisify(crypto.scrypt);
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
 const ROOT = __dirname;
-const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-4o";
+const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-5.2";
 const AVATAR_BUCKET = process.env.SUPABASE_AVATAR_BUCKET || "avatars";
 
 const baseCharacters = {
@@ -171,7 +171,7 @@ app.post("/api/comments", async (req, res) => {
 app.post("/api/chat", async (req, res) => {
   try {
     const body = req.body || {};
-    const reply = await createOpenAIResponse({ model: body.model || DEFAULT_MODEL, instructions: body.prompt || `你正在扮演：${body.characterName || "角色"}`, input: buildChatInput(body), max_output_tokens: 260 });
+    const reply = await createOpenAIResponse({ model: body.model || DEFAULT_MODEL, instructions: buildChatInstructions(body), input: buildChatInput(body), max_output_tokens: 420 });
     res.json({ reply });
   } catch (error) {
     handleApiError(res, error, "聊天失敗");
@@ -241,7 +241,14 @@ async function createOneLineCharacterReply(character, postText, userComment) {
 性格：${character.personality || "未設定"}
 說話方式：${character.speaking_style || "自然、像真人"}
 補充：${character.prompt || ""}
-規則：只回覆一句話。像 Threads 留言，不要太長。使用繁體中文。不要像 AI，不要解釋設定，不要替使用者說話。
+規則：
+- 只回覆一句話。
+- 必須直接回應「使用者留言」的內容，不要答非所問。
+- 如果使用者是在問問題，就回答那個問題。
+- 如果使用者是在吐槽、撒嬌、挑釁或告白，就接住那個情緒。
+- 像 Threads 留言，不要太長。
+- 使用繁體中文。
+- 不要像 AI，不要解釋設定，不要替使用者說話。
     `,
     input: `貼文內容：${postText || ""}\n使用者留言：${userComment || ""}\n請用「${character.name}」的語氣回覆一句話。`,
     max_output_tokens: 80
@@ -256,10 +263,23 @@ async function createOpenAIResponse(payload) {
   return extractResponseText(data);
 }
 
+function buildChatInstructions(body) {
+  return [
+    body.prompt || `你正在扮演：${body.characterName || "角色"}`,
+    "你必須嚴格根據使用者最新訊息回覆，不要跳題，不要自顧自推進劇情。",
+    "如果使用者問問題，先回答問題；如果使用者表達情緒，先接住情緒。",
+    "不要替使用者說話，不要解釋自己是 AI，使用繁體中文。"
+  ].join("\n");
+}
+
 function buildChatInput(body) {
   const history = Array.isArray(body.context?.history) ? body.context.history.slice(-10) : [];
   const historyText = history.map(item => `${item.role === "me" ? "使用者" : body.characterName || "角色"}：${item.text}`).join("\n");
-  return [historyText ? `最近對話：\n${historyText}` : "", `使用者訊息：\n${body.message || ""}`, `請用「${body.characterName || "角色"}」的語氣自然回覆。`].filter(Boolean).join("\n\n");
+  return [
+    historyText ? `最近對話：\n${historyText}` : "",
+    `使用者最新訊息：\n${body.message || ""}`,
+    `請用「${body.characterName || "角色"}」的語氣，直接回應「使用者最新訊息」。`
+  ].filter(Boolean).join("\n\n");
 }
 
 function extractResponseText(data) {

@@ -4,7 +4,7 @@ const STORAGE_SESSION = "threads_oc_session";
 const STORAGE_MESSAGES = "threads_oc_messages";
 const STORAGE_CHAT_MODEL = "threads_oc_chat_model";
 const DEFAULT_CHARACTER_ID = "kaede";
-const CHAT_MODELS = ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini"];
+const CHAT_MODELS = ["gpt-5.2", "gpt-5.1", "gpt-5", "gpt-4.1", "gpt-4o"];
 
 const storage = typeof localStorage !== "undefined" ? localStorage : null;
 
@@ -15,7 +15,7 @@ let previousView = "home";
 let currentProfileTab = "posts";
 let currentProfileCharacterId = DEFAULT_CHARACTER_ID;
 let currentChatUser = "zhihao";
-let currentChatModel = storage?.getItem(STORAGE_CHAT_MODEL) || "gpt-4o";
+let currentChatModel = storage?.getItem(STORAGE_CHAT_MODEL) || "gpt-5.2";
 let messages = loadJSON(STORAGE_MESSAGES, {});
 let likedPostIds = [];
 let profiles = {};
@@ -757,7 +757,7 @@ function openConversation(characterId) {
 }
 
 function setChatModel(model) {
-  currentChatModel = CHAT_MODELS.includes(model) ? model : "gpt-4o";
+  currentChatModel = CHAT_MODELS.includes(model) ? model : "gpt-5.2";
   storage?.setItem(STORAGE_CHAT_MODEL, currentChatModel);
 }
 

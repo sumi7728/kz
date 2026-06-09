@@ -6,8 +6,11 @@ drop table if exists public.profiles cascade;
 
 create table public.profiles (
   id text primary key,
-  display_name text not null default '匿名玩家',
+  username text unique not null,
+  password_hash text not null,
+  display_name text not null default '玩家',
   avatar_url text,
+  player_character_id text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -16,15 +19,14 @@ create table public.characters (
   id text primary key,
   owner_id text not null references public.profiles(id) on delete cascade,
   name text not null,
-  handle text not null,
+  handle text unique not null,
   personality text,
   appearance text,
   speaking_style text,
   avatar_url text,
   prompt text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique(handle)
+  updated_at timestamptz not null default now()
 );
 
 create table public.posts (
@@ -55,6 +57,7 @@ create table public.comment_replies (
 create index characters_owner_id_idx on public.characters(owner_id);
 create index characters_handle_idx on public.characters(handle);
 create index posts_created_at_idx on public.posts(created_at desc);
+create index posts_author_id_idx on public.posts(author_id);
 create index posts_character_id_idx on public.posts(character_id);
 create index comments_post_id_idx on public.comments(post_id);
 create index comment_replies_comment_id_idx on public.comment_replies(comment_id);

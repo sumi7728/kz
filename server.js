@@ -15,8 +15,7 @@ const AVATAR_BUCKET = process.env.SUPABASE_AVATAR_BUCKET || "avatars";
 const ADMIN_USERNAME = "kaede_728";
 
 const aiCharacters = {
-  kaede: baseAI("kaede", "西島楓", "images/kaede.jpg", "漂亮靈動、甜美嘴硬，會撒嬌但不柔弱。", "甜、靈動、會頂嘴，偶爾撒嬌。", "不要變成過度柔弱，不要像 AI。"),
-  zhihao: baseAI("zhihao", "嚴志豪", "images/zhihao.jpg", "西江建設理事長，冷峻強勢，控制慾與佔有慾很重。", "短句、命令式、高位感，吃醋時低氣壓。", "不能突然變得太溫柔，不能一直道歉。"),
+  zhihao: baseAI("zhihao", "嚴志豪", "images/zhihao.jpg", "西江建設理事長，冷峻強勢，控制慾與佔有慾很重。", "短句、命令式、高位感，吃醋時低氣壓。", "不能突然變得太溫柔，不能一直道歉，不能像 AI。"),
   xiayan: baseAI("xiayan", "夏妍", "images/xiayan.jpg", "西島楓的好閨密，嘴快毒舌但很護短。", "像朋友聊天，快、準、有梗。", "不能變正式或像客服。"),
   shuxian: baseAI("shuxian", "尹書賢", "images/shuxian.jpg", "情緒細膩敏感，容易在夜晚想很多。", "夜晚 emo 感，句子不長，帶一點委屈。", "不能過度戲劇化。"),
   youchen: baseAI("youchen", "韓祐成", "images/youchen.jpg", "冷淡慢熱，不擅長表達，但其實很在意。", "短句、克制、慢熱。", "不能突然變熱情直球。"),
@@ -127,7 +126,6 @@ app.post("/api/characters", async (req, res) => {
     const owner_id = cleanId(req.body?.ownerId);
     const handle = normalizeHandle(req.body?.handle || req.body?.name);
     if (!owner_id || !handle) return res.status(400).json({ error: "缺少使用者或帳號" });
-
     const avatar_url = req.body?.avatarDataUrl ? await uploadDataUrl(req.body.avatarDataUrl, `characters/${owner_id}-${Date.now()}`) : "";
     const character = {
       id: `oc_${crypto.randomUUID()}`,
@@ -146,6 +144,34 @@ app.post("/api/characters", async (req, res) => {
     res.json({ character: data });
   } catch (error) {
     handleApiError(res, error, "儲存 OC 失敗");
+  }
+});
+
+app.put("/api/characters/:id", async (req, res) => {
+  try {
+    requireSupabase();
+    const id = String(req.params.id || "");
+    const owner_id = cleanId(req.body?.ownerId);
+    if (!id || !owner_id) return res.status(400).json({ error: "缺少角色資料" });
+    const current = await getCharacterRow(id);
+    if (current.owner_id !== owner_id && !(await isAdminUser(owner_id))) return res.status(403).json({ error: "只能更新自己的 OC" });
+
+    const avatar_url = req.body?.avatarDataUrl ? await uploadDataUrl(req.body.avatarDataUrl, `characters/${owner_id}-${Date.now()}`) : undefined;
+    const payload = {
+      name: normalizeText(req.body?.name).slice(0, 40) || current.name,
+      handle: normalizeHandle(req.body?.handle || current.handle),
+      personality: normalizeText(req.body?.personality).slice(0, 800),
+      appearance: normalizeText(req.body?.appearance).slice(0, 800),
+      speaking_style: normalizeText(req.body?.speakingStyle).slice(0, 500),
+      prompt: buildCharacterPromptText(req.body || current),
+      updated_at: new Date().toISOString()
+    };
+    if (avatar_url) payload.avatar_url = avatar_url;
+    const { data, error } = await supabase.from("characters").update(payload).eq("id", id).select("*").single();
+    if (error) throw error;
+    res.json({ character: data });
+  } catch (error) {
+    handleApiError(res, error, "更新 OC 失敗");
   }
 });
 
@@ -200,41 +226,16 @@ app.post("/api/admin/ai-requests/:id", async (req, res) => {
   try {
     requireSupabase();
     await requireAdmin(req.body?.adminId);
-    const id = cleanId(req.params.id);
     const status = ["approved", "rejected", "pending"].includes(req.body?.status) ? req.body.status : "pending";
     const { data, error } = await supabase.from("ai_character_requests").update({
       status,
       admin_note: normalizeText(req.body?.adminNote).slice(0, 500),
       updated_at: new Date().toISOString()
-    }).eq("id", id).select("*").single();
+    }).eq("id", String(req.params.id || "")).select("*").single();
     if (error) throw error;
     res.json({ request: data });
   } catch (error) {
     handleApiError(res, error, "管理者更新申請失敗");
-  }
-});
-
-app.delete("/api/admin/posts/:id", async (req, res) => {
-  try {
-    requireSupabase();
-    await requireAdmin(req.body?.adminId);
-    const { error } = await supabase.from("posts").delete().eq("id", String(req.params.id || ""));
-    if (error) throw error;
-    res.json({ ok: true });
-  } catch (error) {
-    handleApiError(res, error, "刪除貼文失敗");
-  }
-});
-
-app.delete("/api/admin/comments/:id", async (req, res) => {
-  try {
-    requireSupabase();
-    await requireAdmin(req.body?.adminId);
-    const { error } = await supabase.from("comments").delete().eq("id", String(req.params.id || ""));
-    if (error) throw error;
-    res.json({ ok: true });
-  } catch (error) {
-    handleApiError(res, error, "刪除留言失敗");
   }
 });
 
@@ -247,16 +248,44 @@ app.post("/api/posts", async (req, res) => {
     if (!author_id || !character_id) return res.status(400).json({ error: "請先登入並建立 OC" });
     const text = normalizeText(req.body?.text).slice(0, 1200);
     if (!text) return res.status(400).json({ error: "貼文不能是空的" });
-    const { data, error } = await supabase.from("posts").insert({
-      author_id,
-      character_id,
-      ai_character_id: aiCharacters[ai_character_id] ? ai_character_id : null,
-      text
-    }).select("*").single();
+    const { data, error } = await supabase.from("posts").insert({ author_id, character_id, ai_character_id: aiCharacters[ai_character_id] ? ai_character_id : null, text }).select("*").single();
     if (error) throw error;
     res.json({ post: { ...data, comments: [] } });
   } catch (error) {
     handleApiError(res, error, "發文失敗");
+  }
+});
+
+app.put("/api/posts/:id", async (req, res) => {
+  try {
+    requireSupabase();
+    const userId = cleanId(req.body?.userId);
+    const postId = String(req.params.id || "");
+    const text = normalizeText(req.body?.text).slice(0, 1200);
+    if (!userId || !postId || !text) return res.status(400).json({ error: "缺少貼文資料" });
+    const post = await getPost(postId);
+    if (!(await canModifyPost(userId, post))) return res.status(403).json({ error: "只能編輯自己的貼文" });
+    const { data, error } = await supabase.from("posts").update({ text }).eq("id", postId).select("*").single();
+    if (error) throw error;
+    res.json({ post: data });
+  } catch (error) {
+    handleApiError(res, error, "編輯貼文失敗");
+  }
+});
+
+app.delete("/api/posts/:id", async (req, res) => {
+  try {
+    requireSupabase();
+    const userId = cleanId(req.body?.userId);
+    const postId = String(req.params.id || "");
+    if (!userId || !postId) return res.status(400).json({ error: "缺少貼文資料" });
+    const post = await getPost(postId);
+    if (!(await canModifyPost(userId, post))) return res.status(403).json({ error: "只能刪除自己的貼文" });
+    const { error } = await supabase.from("posts").delete().eq("id", postId);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (error) {
+    handleApiError(res, error, "刪除貼文失敗");
   }
 });
 
@@ -332,10 +361,35 @@ async function requireAdmin(adminId) {
   }
   const { data, error } = await supabase.from("profiles").select("role,username").eq("id", id).single();
   if (error || !data || data.role !== "admin" || data.username !== ADMIN_USERNAME) {
-    const forbidden = new Error("只有西島楓最高權限帳號可以開啟管理者模式");
+    const forbidden = new Error("只有 @kaede_728 可以使用管理者模式");
     forbidden.status = 403;
     throw forbidden;
   }
+  return data;
+}
+
+async function isAdminUser(userId) {
+  try {
+    await requireAdmin(userId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function canModifyPost(userId, post) {
+  if (post.author_id === userId) return true;
+  try {
+    await requireAdmin(userId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function getCharacterRow(characterId) {
+  const { data, error } = await supabase.from("characters").select("*").eq("id", characterId).single();
+  if (error) throw error;
   return data;
 }
 
@@ -391,12 +445,10 @@ async function createOneLineCharacterReply(character, post, userComment, context
 性格：${character.personality}
 說話方式：${character.speaking_style}
 規則：${character.prompt}
-
 使用者專屬記憶：${setting?.memory || "無"}
 互動模式：${setting?.interaction_mode || "自然接話，保持角色感。"}
 稱呼規則：${setting?.nickname || "依上下文自然稱呼。"}
 不可違規規則：${setting?.rules || "不可崩角色，不可像 AI，不可替使用者說話。"}
-
 只回一句話，最多兩句。使用繁體中文。必須看上下文。`,
     input: `貼文：${post.text || ""}\n\n最近留言：${context || "無"}\n\n使用者剛剛 @ 你：${userComment}`,
     max_output_tokens: 100
@@ -415,7 +467,6 @@ function buildChatInstructions(character, body, setting) {
 互動模式：${setting?.interaction_mode || "沉浸式小說互動，不要客服感。"}
 稱呼：${setting?.nickname || "依上下文自然稱呼使用者。"}
 不可違規規則：${setting?.rules || "不可崩角色，不可替使用者說話，不可突然加入重大事件。"}
-
 使用繁體中文。旁白、動作、心理描寫用斜體。角色說話用粗體。一次只回覆一小段。
 不要替使用者決定台詞、動作、情緒。不要總結，不要分析，不要解釋角色設定。
 ${body.prompt || ""}`;

@@ -11,13 +11,13 @@
 <body>
   <main class="app-shell">
     <header class="topbar">
-      <button class="icon-btn back-btn" id="backBtn" onclick="goBack()" aria-label="返回" style="display:none;">返回</button>
+      <button class="icon-btn back-btn" id="backBtn" onclick="goBack()" aria-label="返回" style="display:none;">↩</button>
       <button class="brand" onclick="showHome()" aria-label="夢糖庭院">
         <img src="images/icon.png" alt="">
         <span id="topbarTitle">夢糖庭院</span>
       </button>
       <div class="top-actions">
-        <button class="icon-btn notify-btn" id="notifyBtn" onclick="showNotifications()" aria-label="通知">鈴<span id="notifyBadge"></span></button>
+        <button class="icon-btn notify-btn" id="notifyBtn" onclick="showNotifications()" aria-label="通知">⍾<span id="notifyBadge"></span></button>
         <button class="text-btn" id="authBtn" onclick="showAuth()">登入</button>
       </div>
     </header>
@@ -33,6 +33,11 @@
             <textarea id="postInput" placeholder="登入並建立 OC 後可以發文。輸入 @ 可標記 AI 或其他玩家。" oninput="handleMentionInput('postInput')" onkeydown="handlePostKey(event)"></textarea>
             <div class="mention-menu" id="mentionMenu"></div>
           </div>
+          <label class="file-chip">
+            <span>圖片</span>
+            <input id="postImageInput" type="file" accept="image/*" onchange="previewPostImage('postImageInput', 'postImagePreview')">
+          </label>
+          <img class="composer-preview" id="postImagePreview" alt="" hidden>
           <div class="composer-actions">
             <button class="ghost-btn" onclick="refreshRemoteData()">更新</button>
             <button class="primary-btn" onclick="addPost()">發文</button>
@@ -70,8 +75,8 @@
           <div class="chat-log" id="chatLog"></div>
           <div class="chat-status" id="chatStatus"></div>
           <div class="chat-composer">
-            <textarea id="messageInput" placeholder="輸入訊息，可以寫 [*動作*]..." onkeydown="handleMessageKey(event)"></textarea>
-            <button class="primary-btn send-plane" onclick="sendMessage()">紙飛機</button>
+            <textarea id="messageInput" placeholder="Enter 換行，Ctrl+Enter 送出。可以用 **動作**。" onkeydown="handleMessageKey(event)"></textarea>
+            <button class="primary-btn send-plane" onclick="sendMessage()">➤</button>
           </div>
         </section>
       </div>
@@ -240,6 +245,29 @@
           <div class="account-list" id="adminCharacterList"></div>
         </section>
         <section class="settings-card">
+          <h2>AI 角色發文</h2>
+          <label>選擇角色</label>
+          <select class="field" id="adminPostCharacterSelect"></select>
+          <label>貼文內容</label>
+          <textarea class="field area" id="adminPostTextInput" placeholder="用這個 AI 角色發一篇貼文。"></textarea>
+          <label class="file-chip">
+            <span>上傳圖片</span>
+            <input id="adminPostImageInput" type="file" accept="image/*" onchange="previewPostImage('adminPostImageInput', 'adminPostImagePreview')">
+          </label>
+          <img class="composer-preview" id="adminPostImagePreview" alt="" hidden>
+          <button class="primary-btn" onclick="adminCreateAIPost()">AI 角色發文</button>
+        </section>
+        <section class="settings-card">
+          <h2>AI 角色回覆貼文</h2>
+          <label>選擇貼文</label>
+          <select class="field" id="adminReplyPostSelect"></select>
+          <label>選擇回覆角色</label>
+          <select class="field" id="adminReplyCharacterSelect"></select>
+          <label>回覆方向</label>
+          <textarea class="field area" id="adminReplyGuideInput" placeholder="例如：用吃醋語氣回一句，或替她護短。"></textarea>
+          <button class="primary-btn" onclick="adminCreateAIReply()">讓 AI 回覆</button>
+        </section>
+        <section class="settings-card">
           <h2>AI 角色申請</h2>
           <div class="account-list" id="adminRequestList"></div>
         </section>
@@ -248,10 +276,10 @@
   </main>
 
   <nav class="bottom-nav">
-    <button class="nav-item active" id="navHome" onclick="showHome()" aria-label="首頁"><span>首頁</span></button>
-    <button class="nav-item" id="navSearch" onclick="showSearch()" aria-label="搜尋"><span>搜尋</span></button>
-    <button class="nav-item add" onclick="focusComposer()" aria-label="發文"><span>發文</span></button>
-    <button class="nav-item" id="navMessages" onclick="showMessages()" aria-label="私訊"><span>私訊</span></button>
+    <button class="nav-item active" id="navHome" onclick="showHome()" aria-label="首頁"><span>⌂</span><small>首頁</small></button>
+    <button class="nav-item" id="navSearch" onclick="showSearch()" aria-label="搜尋"><span>⌕</span><small>搜尋</small></button>
+    <button class="nav-item add" onclick="focusComposer()" aria-label="發文"><span>+</span><small>發文</small></button>
+    <button class="nav-item" id="navMessages" onclick="showMessages()" aria-label="私訊"><span>➤</span><small>私訊</small></button>
     <button class="nav-item profile-nav" id="navProfile" onclick="showPlayerProfile()" aria-label="個人頁">
       <img id="navProfileAvatar" src="images/guest-avatar.svg" alt="個人頁">
     </button>

@@ -6,8 +6,8 @@ const STORAGE_MODEL = "dream_sugar_chat_model";
 const STORAGE_EXTRA = "dream_sugar_oc_extra";
 const STORAGE_NOTIFICATIONS = "dream_sugar_notifications";
 const STORAGE_LIKES = "dream_sugar_likes";
-const DEFAULT_MODEL = "gpt-5.2";
-const CHAT_MODELS = ["gpt-5.2", "gpt-5.1", "gpt-5", "gpt-4.1", "gpt-4o"];
+const DEFAULT_MODEL = "gpt-4o";
+const CHAT_MODELS = ["gpt-4o", "gpt-4o-mini"];
 const POST_AI_DELAY_MS = 30000;
 
 let session = loadJSON(STORAGE_SESSION, null);
@@ -20,7 +20,7 @@ let currentView = "home";
 let currentProfileTab = "posts";
 let currentProfileCharacterId = "guest_player";
 let currentChatUser = "zhihao";
-let currentChatModel = localStorage.getItem(STORAGE_MODEL) || DEFAULT_MODEL;
+let currentChatModel = CHAT_MODELS.includes(localStorage.getItem(STORAGE_MODEL)) ? localStorage.getItem(STORAGE_MODEL) : DEFAULT_MODEL;
 let profiles = {};
 let characters = {};
 let aiSettings = {};
@@ -30,6 +30,7 @@ let remoteReady = false;
 let mentionInputId = "postInput";
 let mentionQuery = "";
 let cropFiles = {};
+let postImageDataUrls = {};
 
 const playerDefault = {
   id: "kaede_player",
@@ -190,7 +191,7 @@ function renderShell() {
   setAttr("composerAvatar", "src", player.avatar_url || "images/guest-avatar.svg");
   setText("composerName", player.name || "登入後使用");
   setAttr("navProfileAvatar", "src", player.avatar_url || "images/guest-avatar.svg");
-  setText("authBtn", session ? "齒輪" : "登入");
+  setText("authBtn", session ? "⚙" : "登入");
   const adminBtn = document.getElementById("adminEntryBtn");
   if (adminBtn) adminBtn.style.display = isAdmin() ? "block" : "none";
   document.querySelectorAll(".register-only").forEach(item => {
@@ -269,6 +270,7 @@ function showAIRequestPage() {
 function showAdminPanel() {
   if (!isAdmin()) return showToast("只有 @kaede_728 可以使用管理者模式");
   showView("admin", "adminView");
+  renderAdminAIPostTools();
   renderAdminCharacters();
   renderAdminRequests();
 }
@@ -313,6 +315,7 @@ function refreshCurrentView() {
   if (currentView === "notifications") renderNotifications();
   if (currentView === "aiRequest") renderAIRequests();
   if (currentView === "admin") {
+    renderAdminAIPostTools();
     renderAdminCharacters();
     renderAdminRequests();
   }
@@ -355,13 +358,13 @@ function renderPost(post) {
         ${targetAI ? `<div class="tag-row">標記 AI：<button onclick="showProfile('${targetAI.id}')">${escapeHTML(targetAI.handle)} ${escapeHTML(targetAI.name)}</button></div>` : ""}
         ${post.image_url ? `<img class="post-image" src="${escapeAttribute(post.image_url)}" alt="">` : ""}
         <div class="actions">
-          <button class="action ${liked ? "liked" : ""}" onclick="toggleLike('${post.id}')">${liked ? "已喜歡" : "喜歡"}</button>
-          <button class="action" onclick="focusComment('${post.id}')">回覆</button>
+          <button class="action ${liked ? "liked" : ""}" onclick="toggleLike('${post.id}')">${liked ? "♥ 已喜歡" : "♡ 喜歡"}</button>
+          <button class="action" onclick="focusComment('${post.id}')">↪ 回覆</button>
         </div>
         <div class="comments">${renderComments(post)}</div>
         <div class="reply-input mention-wrap">
           <input id="commentInput-${post.id}" placeholder="${session ? "留言，輸入 @ 可選擇 AI 或玩家。" : "訪客只能觀看，登入後才能留言。"}" oninput="handleMentionInput('commentInput-${post.id}')" onkeydown="handleCommentKey(event, '${post.id}')">
-          <button onclick="submitPostComment('${post.id}')">送出</button>
+          <button onclick="submitPostComment('${post.id}')">➤</button>
         </div>
       </div>
     </article>
@@ -419,17 +422,19 @@ async function addPost() {
   if (!text) return showToast("請輸入貼文內容");
   const player = getPlayerCharacter();
   const mentionedAI = getMentionedAICharacter(text);
+  const imageDataUrl = postImageDataUrls.postImageInput || "";
   try {
     const response = await fetch("/api/posts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ authorId: session.id, characterId: player.id, aiCharacterId: mentionedAI?.id || null, text })
+      body: JSON.stringify({ authorId: session.id, characterId: player.id, aiCharacterId: mentionedAI?.id || null, text, imageDataUrl })
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || `API ${response.status}`);
     const newPost = normalizePost(data.post);
     posts.unshift(newPost);
     input.value = "";
+    clearPostImage("postImageInput", "postImagePreview");
     closeMentionMenu();
     notifyMentions(text, "有人在貼文中提到了你");
     renderHomeFeed();
@@ -437,6 +442,31 @@ async function addPost() {
     await refreshRemoteData({ silent: true });
   } catch (error) {
     showToast(error.message || "發文失敗");
+  }
+}
+
+function previewPostImage(inputId, previewId) {
+  const input = document.getElementById(inputId);
+  const file = input?.files?.[0];
+  const preview = document.getElementById(previewId);
+  if (!file || !preview) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    postImageDataUrls[inputId] = reader.result;
+    preview.src = reader.result;
+    preview.hidden = false;
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearPostImage(inputId, previewId) {
+  delete postImageDataUrls[inputId];
+  const input = document.getElementById(inputId);
+  const preview = document.getElementById(previewId);
+  if (input) input.value = "";
+  if (preview) {
+    preview.hidden = true;
+    preview.removeAttribute("src");
   }
 }
 
@@ -770,22 +800,41 @@ function renderMessages() {
 }
 
 function renderMessageItem(item) {
-  if (item.role === "me") return `<div class="message me">${formatMessageHTML(item.text)}</div>`;
-  return formatAIMessageBlock(item.text);
+  return formatChatMessageBlocks(item.text, item.role === "me" ? "me" : "them");
 }
 
-function formatAIMessageBlock(text) {
+function formatChatMessageBlocks(text, role) {
   const lines = String(text || "").split(/\n+/).map(line => line.trim()).filter(Boolean);
-  const actionLines = [];
-  const speechLines = [];
+  const blocks = [];
   for (const line of lines) {
-    if (/^\*[^*].*\*$/.test(line)) actionLines.push(line.replace(/^\*|\*$/g, ""));
-    else speechLines.push(line);
+    const action = extractActionLine(line, role);
+    if (action) {
+      blocks.push(`<div class="message-action ${role === "me" ? "mine" : ""}">${escapeHTML(action)}</div>`);
+      continue;
+    }
+    splitSpeechBubbles(line).forEach(sentence => {
+      blocks.push(`<div class="message ${role}">${formatMessageHTML(sentence)}</div>`);
+    });
   }
-  return `
-    ${actionLines.map(line => `<div class="message-action">${escapeHTML(line)}</div>`).join("")}
-    <div class="message them">${formatMessageHTML(speechLines.join("\n\n") || text)}</div>
-  `;
+  return blocks.length ? blocks.join("") : `<div class="message ${role}">${formatMessageHTML(text)}</div>`;
+}
+
+function extractActionLine(line, role) {
+  const bracketAction = line.match(/^\[\*(.+?)\*\]$/);
+  if (bracketAction) return bracketAction[1].trim();
+  if (role === "me") {
+    const boldAction = line.match(/^\*\*(.+?)\*\*$/);
+    if (boldAction) return boldAction[1].trim();
+  }
+  const italicAction = line.match(/^\*([^*].*?)\*$/);
+  return italicAction ? italicAction[1].trim() : "";
+}
+
+function splitSpeechBubbles(line) {
+  const cleaned = line.replace(/^\*\*|\*\*$/g, "").trim();
+  if (!cleaned) return [];
+  const parts = cleaned.match(/[^。！？!?]+[。！？!?]?/g) || [cleaned];
+  return parts.map(part => part.trim()).filter(Boolean);
 }
 
 function getConversation(characterId) {
@@ -808,7 +857,7 @@ function setChatModel(model) {
 }
 
 function handleMessageKey(event) {
-  if (event.key === "Enter" && !event.shiftKey) {
+  if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
     event.preventDefault();
     sendMessage();
   }
@@ -959,6 +1008,21 @@ function renderAdminCharacters() {
   list.innerHTML = playerCharacters.length ? playerCharacters.map(renderAdminCharacterCard).join("") : `<div class="empty slim">目前沒有其他玩家 OC。</div>`;
 }
 
+function renderAdminAIPostTools() {
+  const aiOptions = getAICharacters().map(character => `<option value="${character.id}">${escapeHTML(character.name)} ${escapeHTML(character.handle)}</option>`).join("");
+  const postOptions = sortPosts(posts).map(post => {
+    const poster = getCharacter(post.character_id);
+    const label = `${poster.name}｜${post.text.slice(0, 36) || "無文字貼文"}`;
+    return `<option value="${post.id}">${escapeHTML(label)}</option>`;
+  }).join("");
+  const postSelect = document.getElementById("adminPostCharacterSelect");
+  const replyCharacterSelect = document.getElementById("adminReplyCharacterSelect");
+  const replyPostSelect = document.getElementById("adminReplyPostSelect");
+  if (postSelect) postSelect.innerHTML = aiOptions;
+  if (replyCharacterSelect) replyCharacterSelect.innerHTML = aiOptions;
+  if (replyPostSelect) replyPostSelect.innerHTML = postOptions || `<option value="">目前沒有貼文</option>`;
+}
+
 function renderAdminCharacterCard(character) {
   const owner = getProfile(character.owner_id);
   return `
@@ -974,6 +1038,61 @@ function renderAdminCharacterCard(character) {
       <button class="danger-btn" onclick="adminDeleteCharacter('${character.id}')">刪除 OC</button>
     </div>
   `;
+}
+
+async function adminCreateAIPost() {
+  if (!isAdmin()) return showToast("只有 @kaede_728 可以管理");
+  const characterId = getValue("adminPostCharacterSelect");
+  const text = normalizeText(getValue("adminPostTextInput"));
+  const imageDataUrl = postImageDataUrls.adminPostImageInput || "";
+  if (!characterId || (!text && !imageDataUrl)) return showToast("請輸入貼文文字或上傳圖片");
+  try {
+    const response = await fetch("/api/admin/ai-posts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ adminId: session.id, characterId, text, imageDataUrl })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `API ${response.status}`);
+    posts.unshift(normalizePost(data.post));
+    setValue("adminPostTextInput", "");
+    clearPostImage("adminPostImageInput", "adminPostImagePreview");
+    refreshCurrentView();
+    showToast("AI 角色已發文");
+  } catch (error) {
+    showToast(error.message || "AI 角色發文失敗");
+  }
+}
+
+async function adminCreateAIReply() {
+  if (!isAdmin()) return showToast("只有 @kaede_728 可以管理");
+  const postId = getValue("adminReplyPostSelect");
+  const aiCharacterId = getValue("adminReplyCharacterSelect");
+  const guide = normalizeText(getValue("adminReplyGuideInput"));
+  if (!postId || !aiCharacterId) return showToast("請選擇貼文和 AI 角色");
+  try {
+    const post = posts.find(item => item.id === String(postId));
+    const response = await fetch("/api/admin/post-ai-replies", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        adminId: session.id,
+        postId,
+        aiCharacterId,
+        guide,
+        userCharacter: getPlayerCharacter(),
+        postContext: post ? buildPostContext(post) : ""
+      })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `API ${response.status}`);
+    if (post) post.comments.push(normalizePost({ comments: [data.comment] }).comments[0]);
+    setValue("adminReplyGuideInput", "");
+    refreshCurrentView();
+    showToast("AI 回覆已加入");
+  } catch (error) {
+    showToast(error.message || "AI 回覆失敗");
+  }
 }
 
 function renderRequestCard(request) {
@@ -1251,7 +1370,7 @@ function getChatCharacters() {
 
 function getMentionedAICharacter(text) {
   const handles = getMentionedUserHandles(text);
-  return getAICharacters().find(character => handles.includes(normalizeHandle(character.handle)));
+  return getAICharacters().find(character => handles.includes(normalizeHandle(character.handle)) || handles.includes(normalizeHandle(character.name)));
 }
 
 function getMentionedUserHandles(text) {
@@ -1430,6 +1549,7 @@ Object.assign(window, {
   handleCommentKey,
   handleMentionInput,
   insertMention,
+  previewPostImage,
   submitAuth,
   toggleAuthMode,
   logout,
@@ -1441,6 +1561,8 @@ Object.assign(window, {
   handleMessageKey,
   sendMessage,
   submitAIRequest,
+  adminCreateAIPost,
+  adminCreateAIReply,
   adminUpdateRequest,
   adminDeleteCharacter,
   setProfileTab,

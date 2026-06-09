@@ -10,7 +10,8 @@ const app = express();
 const scrypt = promisify(crypto.scrypt);
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT || 3001);
-const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-5.2";
+const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-4o";
+const ALLOWED_MODELS = new Set(["gpt-4o", "gpt-4o-mini"]);
 const AVATAR_BUCKET = process.env.SUPABASE_AVATAR_BUCKET || "avatars";
 const ADMIN_USERNAME = "kaede_728";
 
@@ -259,12 +260,36 @@ app.post("/api/posts", async (req, res) => {
     const character_id = cleanCharacterId(req.body?.characterId);
     const ai_character_id = aiCharacters[cleanCharacterId(req.body?.aiCharacterId)] ? cleanCharacterId(req.body?.aiCharacterId) : null;
     const text = normalizeText(req.body?.text).slice(0, 1200);
-    if (!author_id || !character_id || !text) return res.status(400).json({ error: "貼文資料不完整" });
-    const { data, error } = await supabase.from("posts").insert({ author_id, character_id, ai_character_id, text }).select("*").single();
+    const image_url = req.body?.imageDataUrl ? await uploadDataUrl(req.body.imageDataUrl, `posts/${author_id}`) : "";
+    if (!author_id || !character_id || (!text && !image_url)) return res.status(400).json({ error: "貼文資料不完整" });
+    const { data, error } = await supabase.from("posts").insert({ author_id, character_id, ai_character_id, text: text || "　", image_url }).select("*").single();
     if (error) throw error;
     res.json({ post: { ...data, comments: [] } });
   } catch (error) {
     handleApiError(res, error, "發文失敗");
+  }
+});
+
+app.post("/api/admin/ai-posts", async (req, res) => {
+  try {
+    requireSupabase();
+    const admin = await requireAdmin(req.body?.adminId);
+    const character_id = cleanCharacterId(req.body?.characterId);
+    if (!aiCharacters[character_id]) return res.status(400).json({ error: "找不到 AI 角色" });
+    const text = normalizeText(req.body?.text).slice(0, 1200);
+    const image_url = req.body?.imageDataUrl ? await uploadDataUrl(req.body.imageDataUrl, `posts/${character_id}`) : "";
+    if (!text && !image_url) return res.status(400).json({ error: "請輸入貼文文字或上傳圖片" });
+    const { data, error } = await supabase.from("posts").insert({
+      author_id: admin.id,
+      character_id,
+      ai_character_id: null,
+      text: text || "　",
+      image_url
+    }).select("*").single();
+    if (error) throw error;
+    res.json({ post: { ...data, comments: [] } });
+  } catch (error) {
+    handleApiError(res, error, "AI 角色發文失敗");
   }
 });
 
@@ -349,6 +374,34 @@ app.post("/api/post-ai-reply", async (req, res) => {
   }
 });
 
+app.post("/api/admin/post-ai-replies", async (req, res) => {
+  try {
+    requireSupabase();
+    const admin = await requireAdmin(req.body?.adminId);
+    const postId = String(req.body?.postId || "");
+    const aiCharacterId = cleanCharacterId(req.body?.aiCharacterId);
+    if (!postId || !aiCharacters[aiCharacterId]) return res.status(400).json({ error: "AI 回覆資料不完整" });
+    const post = await getPost(postId);
+    const context = await getPostContext(postId, req.body?.postContext);
+    const setting = await getAiSetting(admin.id, aiCharacterId);
+    const userContext = await getUserContext(admin.id, req.body?.userCharacter);
+    const guide = normalizeText(req.body?.guide).slice(0, 600) || "請依照角色設定自然回覆這篇貼文。";
+    const replyText = await createOneLineCharacterReply(aiCharacters[aiCharacterId], post, `管理者指定回覆方向：${guide}`, context, setting, userContext);
+    const { data: comment, error: commentError } = await supabase.from("comments").insert({
+      post_id: postId,
+      author_id: admin.id,
+      text: "__ai_post_reply__",
+      ai_character_id: aiCharacterId
+    }).select("*").single();
+    if (commentError) throw commentError;
+    const { data: reply, error: replyError } = await supabase.from("comment_replies").insert({ comment_id: comment.id, character_id: aiCharacterId, text: replyText }).select("*").single();
+    if (replyError) throw replyError;
+    res.json({ comment: { ...comment, replies: [reply] } });
+  } catch (error) {
+    handleApiError(res, error, "AI 回覆貼文失敗");
+  }
+});
+
 app.post("/api/chat", async (req, res) => {
   try {
     const body = req.body || {};
@@ -359,7 +412,7 @@ app.post("/api/chat", async (req, res) => {
     const setting = ownerId ? await getAiSetting(ownerId, characterId) : null;
     const userContext = ownerId ? await getUserContext(ownerId, body.userCharacter) : formatUserContext(body.userCharacter);
     const reply = await createOpenAIResponse({
-      model: body.model || DEFAULT_MODEL,
+      model: resolveModel(body.model),
       instructions: buildChatInstructions(character, body, setting, userContext),
       input: buildChatInput(character, body),
       max_output_tokens: 420
@@ -498,7 +551,7 @@ function formatUserContext(character, profile = null) {
 
 async function createOneLineCharacterReply(character, post, userComment, context, setting, userContext) {
   return createOpenAIResponse({
-    model: DEFAULT_MODEL,
+    model: resolveModel(DEFAULT_MODEL),
     instructions: `
 你正在扮演社群平台中的 AI 角色。
 
@@ -535,6 +588,10 @@ ${userComment}
 `,
     max_output_tokens: 120
   });
+}
+
+function resolveModel(model) {
+  return ALLOWED_MODELS.has(model) ? model : "gpt-4o";
 }
 
 function buildChatInstructions(character, body, setting, userContext) {

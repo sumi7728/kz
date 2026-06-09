@@ -229,6 +229,29 @@ app.post("/api/admin/ai-requests/:id", async (req, res) => {
   }
 });
 
+app.delete("/api/admin/characters/:id", async (req, res) => {
+  try {
+    requireSupabase();
+    const admin = await requireAdmin(req.body?.adminId);
+    const characterId = cleanCharacterId(req.params.id);
+    const character = await maybeCharacter(characterId);
+    if (!character) return res.status(404).json({ error: "找不到這個 OC" });
+    if (character.owner_id === admin.id) return res.status(400).json({ error: "不能在這裡刪除自己的 OC" });
+
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .update({ player_character_id: null, updated_at: new Date().toISOString() })
+      .eq("player_character_id", characterId);
+    if (profileError) throw profileError;
+
+    const { error } = await supabase.from("characters").delete().eq("id", characterId);
+    if (error) throw error;
+    res.json({ ok: true, characterId, ownerId: character.owner_id });
+  } catch (error) {
+    handleApiError(res, error, "刪除 OC 失敗");
+  }
+});
+
 app.post("/api/posts", async (req, res) => {
   try {
     requireSupabase();

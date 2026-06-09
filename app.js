@@ -18,7 +18,7 @@ let likedPostIds = loadJSON(STORAGE_LIKES, []);
 let authMode = "login";
 let currentView = "home";
 let currentProfileTab = "posts";
-let currentProfileCharacterId = "kaede_player";
+let currentProfileCharacterId = "guest_player";
 let currentChatUser = "zhihao";
 let currentChatModel = localStorage.getItem(STORAGE_MODEL) || DEFAULT_MODEL;
 let profiles = {};
@@ -44,6 +44,22 @@ const playerDefault = {
   prompt: users.kaede.prompt,
   isAI: false,
   isBase: true
+};
+
+const guestDefault = {
+  id: "guest_player",
+  owner_id: "guest",
+  name: "登入後使用",
+  handle: "@guest",
+  avatar_url: "images/guest-avatar.svg",
+  bio: "登入後可以建立自己的 OC。",
+  personality: "",
+  appearance: "",
+  speaking_style: "",
+  prompt: "",
+  isAI: false,
+  isBase: true,
+  isGuest: true
 };
 
 const baseCharacters = Object.fromEntries(
@@ -76,7 +92,7 @@ async function init() {
 }
 
 function hydrateFallbackData() {
-  characters = { ...baseCharacters, [playerDefault.id]: playerDefault };
+  characters = { ...baseCharacters, [playerDefault.id]: playerDefault, [guestDefault.id]: guestDefault };
   profiles.system = {
     id: "system",
     username: "kaede_728",
@@ -100,6 +116,7 @@ async function refreshRemoteData(options = {}) {
     characters = {
       ...baseCharacters,
       [playerDefault.id]: playerDefault,
+      [guestDefault.id]: guestDefault,
       ...Object.fromEntries((data.characters || []).map(item => [item.id, normalizeCharacter(item)]))
     };
     aiSettings = Object.fromEntries((data.aiSettings || []).map(item => [`${item.owner_id}:${item.character_id}`, item]));
@@ -170,9 +187,9 @@ function normalizePost(post) {
 function renderShell() {
   const player = getPlayerCharacter();
   setText("topbarTitle", titleForView());
-  setAttr("composerAvatar", "src", player.avatar_url || "images/kaede.jpg");
-  setText("composerName", player.name || "西島楓");
-  setAttr("navProfileAvatar", "src", player.avatar_url || "images/kaede.jpg");
+  setAttr("composerAvatar", "src", player.avatar_url || "images/guest-avatar.svg");
+  setText("composerName", player.name || "登入後使用");
+  setAttr("navProfileAvatar", "src", player.avatar_url || "images/guest-avatar.svg");
   setText("authBtn", session ? "齒輪" : "登入");
   const adminBtn = document.getElementById("adminEntryBtn");
   if (adminBtn) adminBtn.style.display = isAdmin() ? "block" : "none";
@@ -252,6 +269,7 @@ function showAIRequestPage() {
 function showAdminPanel() {
   if (!isAdmin()) return showToast("只有 @kaede_728 可以使用管理者模式");
   showView("admin", "adminView");
+  renderAdminCharacters();
   renderAdminRequests();
 }
 
@@ -264,6 +282,7 @@ function showMessages(characterId = currentChatUser) {
 }
 
 function showPlayerProfile() {
+  if (!session) return showAuth();
   showProfile(getPlayerCharacter().id);
 }
 
@@ -293,7 +312,10 @@ function refreshCurrentView() {
   }
   if (currentView === "notifications") renderNotifications();
   if (currentView === "aiRequest") renderAIRequests();
-  if (currentView === "admin") renderAdminRequests();
+  if (currentView === "admin") {
+    renderAdminCharacters();
+    renderAdminRequests();
+  }
 }
 
 function renderHomeFeed() {
@@ -928,6 +950,32 @@ function renderAdminRequests() {
   `).join("") : `<div class="empty slim">目前沒有申請。</div>`;
 }
 
+function renderAdminCharacters() {
+  const list = document.getElementById("adminCharacterList");
+  if (!list) return;
+  const playerCharacters = getUserCharacters()
+    .filter(character => !character.isBase && character.owner_id !== session?.id)
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), "zh-Hant"));
+  list.innerHTML = playerCharacters.length ? playerCharacters.map(renderAdminCharacterCard).join("") : `<div class="empty slim">目前沒有其他玩家 OC。</div>`;
+}
+
+function renderAdminCharacterCard(character) {
+  const owner = getProfile(character.owner_id);
+  return `
+    <div class="admin-character-card">
+      <button class="account-card compact" onclick="showProfile('${character.id}')">
+        <img class="avatar" src="${escapeAttribute(character.avatar_url || "images/kaede.jpg")}" alt="${escapeAttribute(character.name)}">
+        <div class="account-info">
+          <strong>${escapeHTML(character.name)}</strong>
+          <span>${escapeHTML(character.handle)} · 擁有者：${escapeHTML(owner.display_name || owner.username || "玩家")}</span>
+          <p>${escapeHTML(character.bio || character.personality || "尚未填寫簡介")}</p>
+        </div>
+      </button>
+      <button class="danger-btn" onclick="adminDeleteCharacter('${character.id}')">刪除 OC</button>
+    </div>
+  `;
+}
+
 function renderRequestCard(request) {
   const owner = getProfile(request.owner_id);
   return `<div class="request-card"><strong>${escapeHTML(request.name)} <span>@${escapeHTML(normalizeHandle(request.handle))}</span></strong><p>${escapeHTML(request.concept || "沒有填寫概念")}</p><small>${escapeHTML(owner.display_name || "玩家")} · ${statusLabel(request.status)}</small></div>`;
@@ -948,6 +996,32 @@ async function adminUpdateRequest(id, status) {
     showToast("申請狀態已更新");
   } catch (error) {
     showToast(error.message || "更新失敗");
+  }
+}
+
+async function adminDeleteCharacter(characterId) {
+  if (!isAdmin()) return showToast("只有 @kaede_728 可以管理");
+  const character = getCharacter(characterId);
+  if (!confirm(`確定要刪除 ${character.name} ${character.handle} 嗎？\n刪除後該玩家需要重新建立 OC。`)) return;
+  try {
+    const response = await fetch(`/api/admin/characters/${characterId}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ adminId: session.id })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `API ${response.status}`);
+    delete characters[characterId];
+    Object.keys(profiles).forEach(profileId => {
+      if (profiles[profileId]?.player_character_id === characterId) profiles[profileId].player_character_id = null;
+    });
+    delete ocExtra[characterId];
+    saveJSON(STORAGE_EXTRA, ocExtra);
+    renderAdminCharacters();
+    refreshCurrentView();
+    showToast("OC 已刪除");
+  } catch (error) {
+    showToast(error.message || "刪除 OC 失敗");
   }
 }
 
@@ -1122,9 +1196,10 @@ function loadImage(src) {
 }
 
 function getPlayerCharacter() {
+  if (!session) return guestDefault;
   if (session?.player_character_id && characters[session.player_character_id]) return characters[session.player_character_id];
   if (isAdmin()) return playerDefault;
-  return playerDefault;
+  return guestDefault;
 }
 
 function hasPlayerOC() {
@@ -1142,7 +1217,20 @@ function getProfile(id) {
 }
 
 function getCharacter(id) {
-  return characters[id] || baseCharacters[id] || playerDefault;
+  return characters[id] || baseCharacters[id] || {
+    id: id || "deleted_character",
+    owner_id: "deleted",
+    name: "已刪除的 OC",
+    handle: "@deleted",
+    avatar_url: "images/kaede.jpg",
+    bio: "這個 OC 已被管理者刪除。",
+    personality: "",
+    appearance: "",
+    speaking_style: "",
+    prompt: "",
+    isAI: false,
+    isDeleted: true
+  };
 }
 
 function getAICharacters() {
@@ -1150,7 +1238,7 @@ function getAICharacters() {
 }
 
 function getUserCharacters() {
-  return Object.values(characters).filter(character => !character.isAI);
+  return Object.values(characters).filter(character => !character.isAI && !character.isGuest);
 }
 
 function getMentionTargets() {
@@ -1354,6 +1442,7 @@ Object.assign(window, {
   sendMessage,
   submitAIRequest,
   adminUpdateRequest,
+  adminDeleteCharacter,
   setProfileTab,
   toggleLike,
   focusComment,

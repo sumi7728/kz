@@ -25,10 +25,10 @@
     <section class="view active" id="homeView">
       <section class="composer">
         <button class="avatar-button" onclick="showPlayerProfile()">
-          <img class="avatar" id="composerAvatar" src="images/kaede.jpg" alt="玩家頭貼">
+          <img class="avatar" id="composerAvatar" src="images/guest-avatar.svg" alt="玩家頭貼">
         </button>
         <div class="composer-body">
-          <button class="composer-name name-link" id="composerName" onclick="showPlayerProfile()">西島楓</button>
+          <button class="composer-name name-link" id="composerName" onclick="showPlayerProfile()">登入後使用</button>
           <div class="mention-wrap">
             <textarea id="postInput" placeholder="登入並建立 OC 後可以發文。輸入 @ 可標記 AI 或其他玩家。" oninput="handleMentionInput('postInput')" onkeydown="handlePostKey(event)"></textarea>
             <div class="mention-menu" id="mentionMenu"></div>
@@ -234,7 +234,15 @@
       <div class="panel form-panel">
         <h1>管理者模式</h1>
         <p class="muted">只有 @kaede_728 可以使用。</p>
-        <div class="account-list" id="adminRequestList"></div>
+        <section class="settings-card">
+          <h2>玩家 OC 管理</h2>
+          <p class="muted">可以刪除其他玩家建立的 OC。刪除後對方需要重新建立 OC。</p>
+          <div class="account-list" id="adminCharacterList"></div>
+        </section>
+        <section class="settings-card">
+          <h2>AI 角色申請</h2>
+          <div class="account-list" id="adminRequestList"></div>
+        </section>
       </div>
     </section>
   </main>
@@ -245,7 +253,7 @@
     <button class="nav-item add" onclick="focusComposer()" aria-label="發文"><span>發文</span></button>
     <button class="nav-item" id="navMessages" onclick="showMessages()" aria-label="私訊"><span>私訊</span></button>
     <button class="nav-item profile-nav" id="navProfile" onclick="showPlayerProfile()" aria-label="個人頁">
-      <img id="navProfileAvatar" src="images/kaede.jpg" alt="個人頁">
+      <img id="navProfileAvatar" src="images/guest-avatar.svg" alt="個人頁">
     </button>
   </nav>
 

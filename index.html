@@ -5,34 +5,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>夢糖庭院</title>
   <link rel="icon" href="images/icon.png" type="image/png">
+  <link rel="apple-touch-icon" href="images/icon.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main class="app-shell">
     <header class="topbar">
-      <button class="icon-btn back-btn" id="backBtn" onclick="goBack()" aria-label="返回" style="display:none;">‹</button>
+      <button class="icon-btn back-btn" id="backBtn" onclick="goBack()" aria-label="返回" style="display:none;">返回</button>
       <button class="brand" onclick="showHome()" aria-label="夢糖庭院">
         <img src="images/icon.png" alt="">
         <span id="topbarTitle">夢糖庭院</span>
       </button>
       <div class="top-actions">
-        <button class="icon-btn notify-btn" id="notifyBtn" onclick="showNotifications()" aria-label="通知">♡<span id="notifyBadge"></span></button>
+        <button class="icon-btn notify-btn" id="notifyBtn" onclick="showNotifications()" aria-label="通知">鈴<span id="notifyBadge"></span></button>
         <button class="text-btn" id="authBtn" onclick="showAuth()">登入</button>
       </div>
     </header>
 
     <section class="view active" id="homeView">
       <section class="composer">
-        <img class="avatar" id="composerAvatar" src="images/kaede.jpg" alt="目前角色">
+        <button class="avatar-button" onclick="showPlayerProfile()">
+          <img class="avatar" id="composerAvatar" src="images/kaede.jpg" alt="玩家頭貼">
+        </button>
         <div class="composer-body">
-          <div class="composer-name" id="composerName">西島楓</div>
+          <button class="composer-name name-link" id="composerName" onclick="showPlayerProfile()">西島楓</button>
           <div class="mention-wrap">
-            <textarea id="postInput" placeholder="登入後可以發文。輸入 @ 可以標記 AI 或其他玩家。" oninput="handleMentionInput('postInput')" onkeydown="handlePostKey(event)"></textarea>
+            <textarea id="postInput" placeholder="登入並建立 OC 後可以發文。輸入 @ 可標記 AI 或其他玩家。" oninput="handleMentionInput('postInput')" onkeydown="handlePostKey(event)"></textarea>
             <div class="mention-menu" id="mentionMenu"></div>
           </div>
           <div class="composer-actions">
-            <button class="ghost-btn" onclick="refreshRemoteData()">刷新</button>
-            <button class="primary-btn" onclick="addPost()">發佈</button>
+            <button class="ghost-btn" onclick="refreshRemoteData()">更新</button>
+            <button class="primary-btn" onclick="addPost()">發文</button>
           </div>
         </div>
       </section>
@@ -51,7 +54,7 @@
         <div class="section-head">
           <div>
             <h1>通知</h1>
-            <p class="muted">AI 回覆、使用者留言或 @ 你，會先出現在這裡。</p>
+            <p class="muted">AI 回覆、玩家留言或 @ 你，會集中在這裡。</p>
           </div>
           <button class="ghost-btn" onclick="requestNotificationPermission()">開啟推播</button>
         </div>
@@ -64,14 +67,34 @@
         <aside class="conversation-list" id="conversationList"></aside>
         <section class="chat-panel">
           <div class="chat-header" id="chatHeader"></div>
-          <div class="chat-memory" id="chatMemoryPanel"></div>
           <div class="chat-log" id="chatLog"></div>
           <div class="chat-status" id="chatStatus"></div>
           <div class="chat-composer">
-            <textarea id="messageInput" placeholder="輸入訊息..." onkeydown="handleMessageKey(event)"></textarea>
-            <button class="primary-btn" onclick="sendMessage()">送出</button>
+            <textarea id="messageInput" placeholder="輸入訊息，可以寫 [*動作*]..." onkeydown="handleMessageKey(event)"></textarea>
+            <button class="primary-btn send-plane" onclick="sendMessage()">紙飛機</button>
           </div>
         </section>
+      </div>
+    </section>
+
+    <section class="view" id="aiMemoryView">
+      <div class="panel form-panel">
+        <div class="section-head">
+          <div>
+            <h1 id="aiMemoryTitle">AI 記憶</h1>
+            <p class="muted">這些設定會影響此角色與你的私訊和回覆。</p>
+          </div>
+          <button class="ghost-btn" onclick="showMessages(currentChatUser)">回聊天</button>
+        </div>
+        <label>重要記憶</label>
+        <textarea class="field area" id="aiMemoryPageInput" placeholder="例如：他需要記得你們的關係、稱呼、不能踩的界線。"></textarea>
+        <label>互動模式</label>
+        <textarea class="field area" id="aiModePageInput" placeholder="例如：慢熱拉扯、曖昧日常、朋友吐槽、冷淡照顧。"></textarea>
+        <label>角色對你的稱呼</label>
+        <input class="field" id="aiNicknamePageInput" placeholder="例如：嚴太太、名字、暱稱">
+        <label>不可違規規則</label>
+        <textarea class="field area" id="aiRulesPageInput" placeholder="例如：不可替我說話、不可突然崩壞、不可忘記某段關係。"></textarea>
+        <button class="primary-btn wide" onclick="saveAIMemoryPage()">儲存記憶</button>
       </div>
     </section>
 
@@ -79,6 +102,8 @@
       <section class="profile" id="profileArea"></section>
       <nav class="tabs">
         <button class="tab active" onclick="setProfileTab('posts', this)">貼文</button>
+        <button class="tab" onclick="setProfileTab('liked', this)">按讚</button>
+        <button class="tab" onclick="setProfileTab('reposts', this)">轉發</button>
         <button class="tab" onclick="setProfileTab('replies', this)">回覆</button>
       </nav>
       <section class="feed" id="profileFeed"></section>
@@ -88,7 +113,7 @@
       <div class="panel form-panel auth-card">
         <img class="auth-logo" src="images/icon.png" alt="">
         <h1 id="authTitle">登入夢糖庭院</h1>
-        <p class="muted">登入後可以建立 OC、發文留言、和 AI 角色聊天。</p>
+        <p class="muted">登入後可以建立 OC、發文留言，並和 AI 角色私訊互動。</p>
         <label>帳號</label>
         <input class="field" id="authUsername" autocomplete="username" placeholder="例如 kaede_728">
         <label>密碼</label>
@@ -96,7 +121,7 @@
         <label class="register-only">顯示名稱</label>
         <input class="field register-only" id="authDisplayName" placeholder="例如 小楓">
         <button class="primary-btn wide" onclick="submitAuth()">送出</button>
-        <button class="ghost-btn wide" onclick="toggleAuthMode()" id="authToggle">沒有帳號？註冊</button>
+        <button class="ghost-btn wide" onclick="toggleAuthMode()" id="authToggle">沒有帳號，註冊</button>
       </div>
     </section>
 
@@ -105,7 +130,7 @@
         <div class="section-head">
           <div>
             <h1>會員專區</h1>
-            <p class="muted">管理帳號、OC 與專屬 AI 角色申請。</p>
+            <p class="muted">管理帳號、OC 與 AI 角色申請。</p>
           </div>
           <button class="ghost-btn" onclick="logout()">登出</button>
         </div>
@@ -122,7 +147,7 @@
         <div class="section-head">
           <div>
             <h1>OC 設定</h1>
-            <p class="muted">這裡會更新右下角頭貼、個人頁簡介與背景圖。</p>
+            <p class="muted">設定你的社群身份、頭貼、背景與角色資料。</p>
           </div>
           <button class="ghost-btn" onclick="showMemberArea()">會員專區</button>
         </div>
@@ -132,14 +157,20 @@
           <input class="field" id="profileNameInput" placeholder="你的名稱">
           <label>帳號頭貼</label>
           <input class="field file-input" id="profileAvatarInput" type="file" accept="image/*">
+          <div class="crop-panel" id="profileAvatarCropPanel" hidden>
+            <div class="crop-preview square"><img id="profileAvatarPreview" alt=""></div>
+            <label>左右</label><input type="range" id="profileAvatarCropX" min="0" max="100" value="50">
+            <label>上下</label><input type="range" id="profileAvatarCropY" min="0" max="100" value="50">
+            <label>縮放</label><input type="range" id="profileAvatarCropZoom" min="100" max="220" value="100">
+          </div>
           <button class="primary-btn" onclick="saveProfile()">儲存帳號資料</button>
         </section>
         <section class="settings-card">
           <h2>OC 資料</h2>
-          <label>角色名字</label>
+          <label>角色名稱</label>
           <input class="field" id="ocNameInput" placeholder="例如 凜">
           <label>@帳號</label>
-          <input class="field" id="ocHandleInput" placeholder="例如 rin">
+          <input class="field" id="ocHandleInput" placeholder="例如 rin_1212">
           <label>角色簡介</label>
           <textarea class="field area" id="ocBioInput" placeholder="會顯示在個人頁。"></textarea>
           <label>性格</label>
@@ -150,8 +181,20 @@
           <textarea class="field area" id="ocSpeakingInput"></textarea>
           <label>角色頭貼</label>
           <input class="field file-input" id="ocAvatarInput" type="file" accept="image/*">
+          <div class="crop-panel" id="ocAvatarCropPanel" hidden>
+            <div class="crop-preview square"><img id="ocAvatarPreview" alt=""></div>
+            <label>左右</label><input type="range" id="ocAvatarCropX" min="0" max="100" value="50">
+            <label>上下</label><input type="range" id="ocAvatarCropY" min="0" max="100" value="50">
+            <label>縮放</label><input type="range" id="ocAvatarCropZoom" min="100" max="220" value="100">
+          </div>
           <label>背景圖片</label>
           <input class="field file-input" id="ocCoverInput" type="file" accept="image/*">
+          <div class="crop-panel" id="ocCoverCropPanel" hidden>
+            <div class="crop-preview cover"><img id="ocCoverPreview" alt=""></div>
+            <label>左右</label><input type="range" id="ocCoverCropX" min="0" max="100" value="50">
+            <label>上下</label><input type="range" id="ocCoverCropY" min="0" max="100" value="50">
+            <label>縮放</label><input type="range" id="ocCoverCropZoom" min="100" max="220" value="100">
+          </div>
           <button class="primary-btn" onclick="createOC()">儲存 OC</button>
         </section>
       </div>
@@ -167,7 +210,7 @@
           <button class="ghost-btn" onclick="showMemberArea()">會員專區</button>
         </div>
         <section class="settings-card">
-          <label>AI 角色名字</label>
+          <label>AI 角色名稱</label>
           <input class="field" id="requestAINameInput">
           <label>@帳號</label>
           <input class="field" id="requestAIHandleInput">
@@ -179,7 +222,7 @@
           <textarea class="field area" id="requestAIAppearanceInput"></textarea>
           <label>說話風格</label>
           <textarea class="field area" id="requestAISpeakingInput"></textarea>
-          <label>角色規則</label>
+          <label>角色 Prompt</label>
           <textarea class="field area" id="requestAIPromptInput"></textarea>
           <button class="primary-btn" onclick="submitAIRequest()">送出申請</button>
           <div class="account-list" id="myAIRequestList"></div>
@@ -197,16 +240,16 @@
   </main>
 
   <nav class="bottom-nav">
-    <button class="nav-item active" id="navHome" onclick="showHome()" aria-label="首頁">⌂</button>
-    <button class="nav-item" id="navSearch" onclick="showSearch()" aria-label="搜尋">⌕</button>
-    <button class="nav-item add" onclick="focusComposer()" aria-label="新增">＋</button>
-    <button class="nav-item" id="navMessages" onclick="showMessages()" aria-label="私訊">✉</button>
-    <button class="nav-item profile-nav" id="navProfile" onclick="showOCSettings()" aria-label="OC 設定">
-      <img id="navProfileAvatar" src="images/kaede.jpg" alt="OC 設定">
+    <button class="nav-item active" id="navHome" onclick="showHome()" aria-label="首頁"><span>首頁</span></button>
+    <button class="nav-item" id="navSearch" onclick="showSearch()" aria-label="搜尋"><span>搜尋</span></button>
+    <button class="nav-item add" onclick="focusComposer()" aria-label="發文"><span>發文</span></button>
+    <button class="nav-item" id="navMessages" onclick="showMessages()" aria-label="私訊"><span>私訊</span></button>
+    <button class="nav-item profile-nav" id="navProfile" onclick="showPlayerProfile()" aria-label="個人頁">
+      <img id="navProfileAvatar" src="images/kaede.jpg" alt="個人頁">
     </button>
   </nav>
 
-  <div class="toast" id="toast">已更新</div>
+  <div class="toast" id="toast">已完成</div>
   <script type="module" src="app.js"></script>
 </body>
 </html>

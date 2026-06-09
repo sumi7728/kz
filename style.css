@@ -114,7 +114,8 @@ button {
   grid-column: 1;
   width: 48px;
   margin-left: 4px;
-  font-size: 30px;
+  font-size: 13px;
+  font-weight: 900;
 }
 
 .text-btn {
@@ -323,8 +324,39 @@ button {
   box-shadow: 0 16px 40px rgba(219, 118, 157, 0.18);
 }
 
-.mention-menu.show {
+.mention-menu.show,
+.mention-menu.open {
   display: grid;
+}
+
+.avatar-button,
+.name-link {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  text-align: left;
+  border-radius: 999px;
+}
+
+.avatar-button:focus-visible,
+.name-link:focus-visible,
+.icon-btn:focus-visible,
+.text-btn:focus-visible,
+.nav-item:focus-visible,
+.primary-btn:focus-visible,
+.ghost-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.name-link {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.name-link.strong {
+  font-weight: 900;
 }
 
 .mention-menu button,
@@ -443,13 +475,19 @@ button {
 
 .actions {
   display: flex;
-  gap: 20px;
+  gap: 10px;
   margin-top: 12px;
-  font-size: 20px;
 }
 
 .action {
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
   line-height: 1;
+  background: #fff8fb;
 }
 
 .action.liked {
@@ -474,6 +512,10 @@ button {
   margin-top: 10px;
   padding-left: 10px;
   border-left: 2px solid var(--line);
+}
+
+.ai-top-comment {
+  margin-top: 10px;
 }
 
 .comment-body,
@@ -560,6 +602,55 @@ button {
 
 .settings-card h2 {
   font-size: 17px;
+}
+
+.crop-panel {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fffafd;
+}
+
+.crop-panel[hidden] {
+  display: none;
+}
+
+.crop-panel label {
+  margin-top: 2px;
+}
+
+.crop-panel input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.crop-preview {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--soft);
+}
+
+.crop-preview.square {
+  width: min(220px, 100%);
+  aspect-ratio: 1;
+  justify-self: center;
+  border-radius: 50%;
+}
+
+.crop-preview.cover {
+  width: 100%;
+  aspect-ratio: 16 / 6;
+}
+
+.crop-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform-origin: center;
 }
 
 .account-list {
@@ -751,7 +842,7 @@ button {
 
 .chat-panel {
   display: grid;
-  grid-template-rows: auto auto 1fr auto auto;
+  grid-template-rows: auto 1fr auto auto;
   min-height: 0;
 }
 
@@ -804,6 +895,12 @@ button {
   align-items: center;
 }
 
+.memory-link {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
 .model-picker select {
   max-width: 118px;
   height: 34px;
@@ -831,6 +928,12 @@ button {
   word-break: break-word;
 }
 
+.message strong {
+  display: block;
+  margin: 6px 0;
+  font-weight: 900;
+}
+
 .message.me {
   align-self: flex-end;
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
@@ -841,6 +944,16 @@ button {
   align-self: flex-start;
   border: 1px solid var(--line);
   background: #fff;
+}
+
+.message-action {
+  max-width: 82%;
+  align-self: flex-start;
+  color: var(--muted);
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1.6;
+  padding: 2px 4px 0;
 }
 
 .chat-status {
@@ -866,6 +979,10 @@ button {
   background: var(--soft);
   padding: 10px 12px;
   resize: vertical;
+}
+
+.send-plane {
+  min-width: 74px;
 }
 
 .empty {
@@ -903,7 +1020,9 @@ button {
   align-items: center;
   justify-content: center;
   opacity: 0.58;
-  font-size: 22px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .nav-item.active {
@@ -912,7 +1031,8 @@ button {
 
 .nav-item.add {
   opacity: 1;
-  font-size: 30px;
+  color: var(--accent);
+  font-size: 13px;
 }
 
 .profile-nav img {
@@ -970,6 +1090,33 @@ button {
 
   .model-picker span {
     display: none;
+  }
+
+  .chat-header {
+    flex-wrap: wrap;
+  }
+
+  .chat-title {
+    flex: 1 1 calc(100% - 56px);
+  }
+
+  .memory-link {
+    order: 3;
+  }
+
+  .model-picker {
+    order: 4;
+    margin-left: auto;
+  }
+
+  .send-plane {
+    min-width: 62px;
+    padding: 0 12px;
+  }
+
+  .message,
+  .message-action {
+    max-width: 90%;
   }
 }
 

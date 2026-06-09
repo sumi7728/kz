@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>角色動態</title>
+  <title>OC 社群</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -12,17 +12,18 @@
     <header class="topbar">
       <button class="topbar-left" id="backBtn" onclick="goBack()" style="display:none;">‹</button>
       <div class="topbar-title" id="topbarTitle">動態</div>
-      <button class="topbar-right" onclick="showAdmin()">⋯</button>
+      <button class="topbar-right" onclick="showOCManager()">OC</button>
     </header>
 
     <section class="view active" id="homeView">
       <section class="composer" id="composer">
-        <img class="avatar" src="images/kaede.jpg" alt="西島楓">
+        <img class="avatar" id="composerAvatar" src="images/kaede.jpg" alt="我的頭貼">
         <div class="composer-main">
-          <div class="composer-name">西島楓</div>
-          <textarea id="postInput" placeholder="今天想發什麼動態？"></textarea>
+          <div class="composer-name" id="composerName">匿名玩家</div>
+          <select class="composer-select" id="postCharacterSelect"></select>
+          <textarea id="postInput" placeholder="寫一則動態，並標記一個 OC..."></textarea>
           <div class="composer-bottom">
-            <button class="tool-btn" onclick="showToast('圖片功能保留中')">📷</button>
+            <button class="tool-btn" onclick="refreshRemoteData()">重新整理</button>
             <button class="post-btn" onclick="addPost()">發布</button>
           </div>
         </div>
@@ -41,7 +42,7 @@
 
     <section class="view" id="searchView">
       <div class="search-page">
-        <input class="search-box" id="searchInput" type="text" placeholder="搜尋角色" oninput="renderSearch()">
+        <input class="search-box" id="searchInput" type="text" placeholder="搜尋角色或 OC" oninput="renderSearch()">
         <div class="account-list" id="accountList"></div>
       </div>
     </section>
@@ -61,39 +62,50 @@
       </div>
     </section>
 
-    <section class="view" id="likedView">
-      <section class="feed" id="likedFeed"></section>
-    </section>
-
-    <section class="view" id="adminView">
+    <section class="view" id="ocView">
       <div class="admin-page">
         <div class="admin-header">
           <div>
-            <h2>管理者模式</h2>
-            <p>調整角色 prompt、開放模式與 API 行為。</p>
+            <h2>我的設定與 OC</h2>
+            <p>設定匿名暱稱、頭貼，建立可以被貼文標記的角色。</p>
           </div>
-          <button class="admin-small-btn" onclick="showHome()">離開</button>
+          <button class="admin-small-btn" onclick="showHome()">回動態</button>
         </div>
 
         <div class="admin-card">
-          <label class="admin-label">角色</label>
-          <select class="admin-input" id="promptUserSelect" onchange="loadPromptEditor()"></select>
+          <h3>匿名身分</h3>
+          <label class="admin-label">暱稱</label>
+          <input class="admin-input" id="profileNameInput" placeholder="例如：小楓">
 
-          <label class="admin-label">角色 prompt</label>
-          <textarea class="admin-textarea prompt-textarea" id="promptText"></textarea>
+          <label class="admin-label">頭貼</label>
+          <input class="admin-input file-input" id="profileAvatarInput" type="file" accept="image/*">
 
-          <label class="switch-row">
-            <input id="openModeToggle" type="checkbox">
-            <span>開放模式：允許更長、更有張力的角色回覆</span>
-          </label>
-
-          <button class="admin-btn dark" onclick="savePromptEditor()">儲存 prompt</button>
+          <button class="admin-btn dark" onclick="saveProfile()">儲存身分</button>
         </div>
 
         <div class="admin-card">
-          <h3>API 狀態</h3>
-          <p id="apiStatus">尚未檢查</p>
-          <button class="admin-btn" onclick="checkApiStatus()">檢查 API</button>
+          <h3>建立我的角色 OC</h3>
+          <label class="admin-label">角色名稱</label>
+          <input class="admin-input" id="ocNameInput" placeholder="例如：霧島凜">
+
+          <label class="admin-label">性格</label>
+          <textarea class="admin-textarea" id="ocPersonalityInput" placeholder="例如：嘴硬、護短、很會吃醋，但不會直接承認。"></textarea>
+
+          <label class="admin-label">外表</label>
+          <textarea class="admin-textarea" id="ocAppearanceInput" placeholder="例如：黑髮、冷白皮、常穿深色外套。"></textarea>
+
+          <label class="admin-label">說話方式</label>
+          <textarea class="admin-textarea" id="ocSpeakingInput" placeholder="例如：短句、低聲、偶爾毒舌，只回一句。"></textarea>
+
+          <label class="admin-label">角色頭貼</label>
+          <input class="admin-input file-input" id="ocAvatarInput" type="file" accept="image/*">
+
+          <button class="admin-btn dark" onclick="createOC()">新增 OC</button>
+        </div>
+
+        <div class="admin-card">
+          <h3>我的 OC</h3>
+          <div class="account-list" id="myOCList"></div>
         </div>
       </div>
     </section>
@@ -104,14 +116,10 @@
     <button class="nav-item" id="navSearch" onclick="showSearch()" aria-label="搜尋">⌕</button>
     <button class="nav-item add" onclick="focusComposer()" aria-label="新增貼文">＋</button>
     <button class="nav-item" id="navMessages" onclick="showMessages()" aria-label="私訊">✉</button>
-    <button class="nav-item" id="navLiked" onclick="showLiked()" aria-label="喜歡">♡</button>
-    <button class="nav-item profile-nav" id="navProfile" onclick="showProfile('kaede')" aria-label="個人頁">
-      <img src="images/kaede.jpg" alt="西島楓">
-    </button>
+    <button class="nav-item" id="navOC" onclick="showOCManager()" aria-label="我的 OC">OC</button>
   </nav>
 
-  <div class="toast" id="toast">提示</div>
-
+  <div class="toast" id="toast">已更新</div>
   <script type="module" src="app.js"></script>
 </body>
 </html>

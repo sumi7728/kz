@@ -12,35 +12,37 @@
   <main class="app-shell">
     <header class="topbar">
       <button class="icon-btn back-btn" id="backBtn" onclick="goBack()" aria-label="返回" style="display:none;">↩</button>
+      <button class="icon-btn refresh-btn" id="refreshBtn" onclick="refreshRemoteData()" aria-label="更新">🔄</button>
       <button class="brand" onclick="showHome()" aria-label="夢糖庭院">
         <img src="images/icon.png" alt="">
         <span id="topbarTitle">夢糖庭院</span>
       </button>
       <div class="top-actions">
-        <button class="icon-btn notify-btn" id="notifyBtn" onclick="showNotifications()" aria-label="通知">⍾<span id="notifyBadge"></span></button>
+        <button class="icon-btn notify-btn" id="notifyBtn" onclick="showNotifications()" aria-label="通知">🔔<span id="notifyBadge"></span></button>
         <button class="text-btn" id="authBtn" onclick="showAuth()">登入</button>
       </div>
     </header>
 
     <section class="view active" id="homeView">
       <section class="composer">
-        <button class="avatar-button" onclick="showPlayerProfile()">
-          <img class="avatar" id="composerAvatar" src="images/guest-avatar.svg" alt="玩家頭貼">
-        </button>
         <div class="composer-body">
-          <button class="composer-name name-link" id="composerName" onclick="showPlayerProfile()">登入後使用</button>
+          <div class="composer-identity">
+            <button class="avatar-button" onclick="showPlayerProfile()">
+              <img class="avatar" id="composerAvatar" src="images/guest-avatar.svg" alt="玩家頭貼">
+            </button>
+            <button class="composer-name name-link" id="composerName" onclick="showPlayerProfile()">登入後使用</button>
+          </div>
           <div class="mention-wrap">
-            <textarea id="postInput" placeholder="登入並建立 OC 後可以發文。輸入 @ 可標記 AI 或其他玩家。" oninput="handleMentionInput('postInput')" onkeydown="handlePostKey(event)"></textarea>
+            <textarea id="postInput" placeholder="在想什麼呢？輸入 @ 可以標記角色。" oninput="handleMentionInput('postInput')" onkeydown="handlePostKey(event)"></textarea>
             <div class="mention-menu" id="mentionMenu"></div>
           </div>
-          <label class="file-chip">
-            <span>圖片</span>
-            <input id="postImageInput" type="file" accept="image/*" onchange="previewPostImage('postImageInput', 'postImagePreview')">
-          </label>
           <img class="composer-preview" id="postImagePreview" alt="" hidden>
           <div class="composer-actions">
-            <button class="ghost-btn" onclick="refreshRemoteData()">更新</button>
-            <button class="primary-btn" onclick="addPost()">發文</button>
+            <label class="file-chip">
+              <span>🖼️</span>
+              <input id="postImageInput" type="file" accept="image/*" onchange="previewPostImage('postImageInput', 'postImagePreview')">
+            </label>
+            <button class="primary-btn composer-send" onclick="addPost()">➤</button>
           </div>
         </div>
       </section>
@@ -97,6 +99,8 @@
         <textarea class="field area" id="aiModePageInput" placeholder="例如：慢熱拉扯、曖昧日常、朋友吐槽、冷淡照顧。"></textarea>
         <label>角色對你的稱呼</label>
         <input class="field" id="aiNicknamePageInput" placeholder="例如：嚴太太、名字、暱稱">
+        <label>你在聊天室顯示的暱稱</label>
+        <input class="field" id="chatNicknamePageInput" placeholder="例如：小楓、凜、我的暱稱">
         <label>不可違規規則</label>
         <textarea class="field area" id="aiRulesPageInput" placeholder="例如：不可替我說話、不可突然崩壞、不可忘記某段關係。"></textarea>
         <button class="primary-btn wide" onclick="saveAIMemoryPage()">儲存記憶</button>
@@ -140,7 +144,8 @@
           <button class="ghost-btn" onclick="logout()">登出</button>
         </div>
         <div class="menu-grid">
-          <button onclick="showOCSettings()">OC 設定</button>
+          <button onclick="showProfileEditor()">編輯個人頁</button>
+          <button onclick="showOCSettings()">OC 角色設定</button>
           <button onclick="showAIRequestPage()">申請專屬 AI 角色</button>
           <button class="admin-only" id="adminEntryBtn" onclick="showAdminPanel()" style="display:none;">管理者模式</button>
         </div>
@@ -157,7 +162,34 @@
           <button class="ghost-btn" onclick="showMemberArea()">會員專區</button>
         </div>
         <section class="settings-card">
-          <h2>帳號資料</h2>
+          <h2>OC 身份核心</h2>
+          <p class="muted">這裡是角色本身的設定，會影響你的社群身份與 AI 判讀上下文。</p>
+          <label>角色名稱</label>
+          <input class="field" id="ocNameInput" placeholder="例如 凜">
+          <label>@帳號</label>
+          <input class="field" id="ocHandleInput" placeholder="例如 rin_1212">
+          <label>性格</label>
+          <textarea class="field area" id="ocPersonalityInput"></textarea>
+          <label>外表</label>
+          <textarea class="field area" id="ocAppearanceInput"></textarea>
+          <label>說話風格</label>
+          <textarea class="field area" id="ocSpeakingInput"></textarea>
+          <button class="primary-btn" onclick="createOC()">儲存 OC 設定</button>
+        </section>
+      </div>
+    </section>
+
+    <section class="view" id="profileEditView">
+      <div class="panel form-panel">
+        <div class="section-head">
+          <div>
+            <h1>編輯個人頁</h1>
+            <p class="muted">這裡只調整社群頁面外觀，不改角色核心個性。</p>
+          </div>
+          <button class="ghost-btn" onclick="showMemberArea()">會員專區</button>
+        </div>
+        <section class="settings-card visual-card">
+          <h2>頁面外觀</h2>
           <label>顯示名稱</label>
           <input class="field" id="profileNameInput" placeholder="你的名稱">
           <label>帳號頭貼</label>
@@ -166,31 +198,17 @@
             <div class="crop-preview square"><img id="profileAvatarPreview" alt=""></div>
             <label>左右</label><input type="range" id="profileAvatarCropX" min="0" max="100" value="50">
             <label>上下</label><input type="range" id="profileAvatarCropY" min="0" max="100" value="50">
-            <label>縮放</label><input type="range" id="profileAvatarCropZoom" min="100" max="220" value="100">
+            <label>縮放</label><input type="range" id="profileAvatarCropZoom" min="100" max="360" step="1" value="100">
           </div>
-          <button class="primary-btn" onclick="saveProfile()">儲存帳號資料</button>
-        </section>
-        <section class="settings-card">
-          <h2>OC 資料</h2>
-          <label>角色名稱</label>
-          <input class="field" id="ocNameInput" placeholder="例如 凜">
-          <label>@帳號</label>
-          <input class="field" id="ocHandleInput" placeholder="例如 rin_1212">
           <label>角色簡介</label>
           <textarea class="field area" id="ocBioInput" placeholder="會顯示在個人頁。"></textarea>
-          <label>性格</label>
-          <textarea class="field area" id="ocPersonalityInput"></textarea>
-          <label>外表</label>
-          <textarea class="field area" id="ocAppearanceInput"></textarea>
-          <label>說話風格</label>
-          <textarea class="field area" id="ocSpeakingInput"></textarea>
           <label>角色頭貼</label>
           <input class="field file-input" id="ocAvatarInput" type="file" accept="image/*">
           <div class="crop-panel" id="ocAvatarCropPanel" hidden>
             <div class="crop-preview square"><img id="ocAvatarPreview" alt=""></div>
             <label>左右</label><input type="range" id="ocAvatarCropX" min="0" max="100" value="50">
             <label>上下</label><input type="range" id="ocAvatarCropY" min="0" max="100" value="50">
-            <label>縮放</label><input type="range" id="ocAvatarCropZoom" min="100" max="220" value="100">
+            <label>縮放</label><input type="range" id="ocAvatarCropZoom" min="100" max="360" step="1" value="100">
           </div>
           <label>背景圖片</label>
           <input class="field file-input" id="ocCoverInput" type="file" accept="image/*">
@@ -198,9 +216,9 @@
             <div class="crop-preview cover"><img id="ocCoverPreview" alt=""></div>
             <label>左右</label><input type="range" id="ocCoverCropX" min="0" max="100" value="50">
             <label>上下</label><input type="range" id="ocCoverCropY" min="0" max="100" value="50">
-            <label>縮放</label><input type="range" id="ocCoverCropZoom" min="100" max="220" value="100">
+            <label>縮放</label><input type="range" id="ocCoverCropZoom" min="100" max="360" step="1" value="100">
           </div>
-          <button class="primary-btn" onclick="createOC()">儲存 OC</button>
+          <button class="primary-btn" onclick="saveProfilePage()">儲存個人頁</button>
         </section>
       </div>
     </section>
@@ -239,12 +257,36 @@
       <div class="panel form-panel">
         <h1>管理者模式</h1>
         <p class="muted">只有 @kaede_728 可以使用。</p>
-        <section class="settings-card">
+        <nav class="admin-bubbles">
+          <button class="active" data-admin-tab="oc" onclick="setAdminTab('oc')">OC</button>
+          <button data-admin-tab="post" onclick="setAdminTab('post')">貼文維護</button>
+          <button data-admin-tab="aiPost" onclick="setAdminTab('aiPost')">AI 發文</button>
+          <button data-admin-tab="aiReply" onclick="setAdminTab('aiReply')">AI 回覆</button>
+          <button data-admin-tab="requests" onclick="setAdminTab('requests')">申請</button>
+        </nav>
+        <section class="settings-card admin-section" id="adminManageOC" data-admin-section="oc">
           <h2>玩家 OC 管理</h2>
           <p class="muted">可以刪除其他玩家建立的 OC。刪除後對方需要重新建立 OC。</p>
           <div class="account-list" id="adminCharacterList"></div>
         </section>
-        <section class="settings-card">
+        <section class="settings-card admin-section" id="adminPostMaintain" data-admin-section="post">
+          <h2>貼文維護</h2>
+          <label>選擇貼文</label>
+          <select class="field" id="adminMaintainPostSelect" onchange="loadAdminPostMaintenance()"></select>
+          <div class="metric-grid">
+            <label>愛心<input class="field" id="adminMetricLikes" type="number" min="0" value="0"></label>
+            <label>留言<input class="field" id="adminMetricComments" type="number" min="0" value="0"></label>
+            <label>轉發<input class="field" id="adminMetricReposts" type="number" min="0" value="0"></label>
+            <label>分享<input class="field" id="adminMetricShares" type="number" min="0" value="0"></label>
+          </div>
+          <button class="primary-btn" onclick="saveAdminPostMetrics()">儲存數據</button>
+          <h3>假帳號留言</h3>
+          <input class="field" id="fakeCommentNameInput" placeholder="假帳號名稱，例如 甜甜觀察員">
+          <input class="field" id="fakeCommentHandleInput" placeholder="@帳號，例如 sugar_watch">
+          <textarea class="field area" id="fakeCommentTextInput" placeholder="留言內容"></textarea>
+          <button class="ghost-btn" onclick="adminAddFakeComment()">新增假留言</button>
+        </section>
+        <section class="settings-card admin-section" id="adminAIPost" data-admin-section="aiPost">
           <h2>AI 角色發文</h2>
           <label>選擇角色</label>
           <select class="field" id="adminPostCharacterSelect"></select>
@@ -257,7 +299,7 @@
           <img class="composer-preview" id="adminPostImagePreview" alt="" hidden>
           <button class="primary-btn" onclick="adminCreateAIPost()">AI 角色發文</button>
         </section>
-        <section class="settings-card">
+        <section class="settings-card admin-section" id="adminAIReply" data-admin-section="aiReply">
           <h2>AI 角色回覆貼文</h2>
           <label>選擇貼文</label>
           <select class="field" id="adminReplyPostSelect"></select>
@@ -267,7 +309,7 @@
           <textarea class="field area" id="adminReplyGuideInput" placeholder="例如：用吃醋語氣回一句，或替她護短。"></textarea>
           <button class="primary-btn" onclick="adminCreateAIReply()">讓 AI 回覆</button>
         </section>
-        <section class="settings-card">
+        <section class="settings-card admin-section" id="adminAIRequests" data-admin-section="requests">
           <h2>AI 角色申請</h2>
           <div class="account-list" id="adminRequestList"></div>
         </section>

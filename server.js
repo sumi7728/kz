@@ -3,6 +3,7 @@ const express = require("express");
 const path = require("path");
 const { promisify } = require("util");
 const { createClient } = require("@supabase/supabase-js");
+const WebSocket = require("ws");
 
 require("dotenv").config({ override: true });
 
@@ -11,12 +12,13 @@ const scrypt = promisify(crypto.scrypt);
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT || 3001);
 const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-4o";
-const ALLOWED_MODELS = new Set(["gpt-4o", "gpt-4o-mini"]);
+const REPLY_MODEL = process.env.OPENAI_REPLY_MODEL || "gpt-4.1";
+const ALLOWED_MODELS = new Set(["gpt-4.1", "gpt-4o", "gpt-4o-mini"]);
 const AVATAR_BUCKET = process.env.SUPABASE_AVATAR_BUCKET || "avatars";
 const ADMIN_USERNAME = "kaede_728";
 
 const aiCharacters = {
-  zhihao: baseAI("zhihao", "嚴志豪", "@zhihao", "images/zhihao.jpg", "24歲，西江建設理事長。冷峻、強勢、控制慾與佔有慾都很重，對西島楓有強烈保護欲。", "短句、命令式、高位感。吃醋時低氣壓，不大吵大鬧。", "不能突然過度溫柔，不能一直道歉，不能像 AI 說明。稱呼西島楓可叫西島楓或嚴太太。"),
+  zhihao: baseAI("zhihao", "嚴志豪", "@zhihao", "images/zhihao.jpg", "24歲，西江建設理事長，西島楓的丈夫。冷峻、強勢、控制慾與佔有慾都很重，對西島楓有強烈保護欲。", "短句、命令式、高位感。吃醋時低氣壓，不大吵大鬧。", "不能突然過度溫柔，不能一直道歉，不能像 AI 說明。稱呼西島楓可叫楓或嚴太太。"),
   xiayan: baseAI("xiayan", "夏妍", "@xiayan", "images/xiayan.jpg", "西島楓的好閨密，嘴快毒舌但很護短。", "朋友聊天感，直接、吐槽、節奏快。", "可以吐槽嚴志豪，也會護短。不要太正式。"),
   shuxian: baseAI("shuxian", "尹書賢", "@shuxian", "images/shuxian.jpg", "情緒細膩、敏感、容易想很多，和韓祐成有拉扯。", "夜晚 emo 感，嘴硬、委屈、細膩。", "不要變成只會哭的人。"),
   youchen: baseAI("youchen", "韓祐成", "@youchen", "images/youchen.jpg", "偏冷淡、不擅長表達，其實很在意但常先否認。", "短句、克制、慢熱。", "不要突然變得熱情。"),
@@ -154,6 +156,16 @@ app.post("/api/characters", async (req, res) => {
         const result = await supabase.from("characters").update(payload).eq("id", existingId).select("*").single();
         if (result.error) throw result.error;
         data = result.data;
+      }
+    }
+    if (!data) {
+      const existingOwned = await maybeCharacterByOwner(owner_id);
+      if (existingOwned) {
+        const result = await supabase.from("characters").update(payload).eq("id", existingOwned.id).select("*").single();
+        if (result.error) throw result.error;
+        data = result.data;
+        const { error } = await supabase.from("profiles").update({ player_character_id: data.id, updated_at: new Date().toISOString() }).eq("id", owner_id);
+        if (error) throw error;
       }
     }
     if (!data) {
@@ -430,8 +442,11 @@ function baseAI(id, name, handle, avatar_url, personality, speaking_style, promp
 }
 
 function createSupabaseClient() {
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return null;
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY, {
+    realtime: {
+      transport: WebSocket
+    }
+  });
 }
 
 function requireSupabase() {
@@ -444,7 +459,7 @@ function requireSupabase() {
 
 async function requireAdmin(adminId) {
   const id = cleanId(adminId);
-  const { data, error } = await supabase.from("profiles").select("role,username").eq("id", id).single();
+  const { data, error } = await supabase.from("profiles").select("id,role,username").eq("id", id).single();
   if (error || !data || data.role !== "admin" || data.username !== ADMIN_USERNAME) {
     const forbidden = new Error("只有 @kaede_728 可以使用管理者模式");
     forbidden.status = 403;
@@ -503,6 +518,12 @@ async function maybeCharacter(characterId) {
   return data || null;
 }
 
+async function maybeCharacterByOwner(ownerId) {
+  if (!ownerId) return null;
+  const { data } = await supabase.from("characters").select("*").eq("owner_id", ownerId).order("created_at", { ascending: true }).limit(1).maybeSingle();
+  return data || null;
+}
+
 async function getPost(postId) {
   const { data, error } = await supabase.from("posts").select("*").eq("id", postId).single();
   if (error) throw error;
@@ -551,7 +572,7 @@ function formatUserContext(character, profile = null) {
 
 async function createOneLineCharacterReply(character, post, userComment, context, setting, userContext) {
   return createOpenAIResponse({
-    model: resolveModel(DEFAULT_MODEL),
+    model: resolveModel(REPLY_MODEL),
     instructions: `
 你正在扮演社群平台中的 AI 角色。
 
@@ -614,7 +635,7 @@ ${formatSetting(setting)}
 【私訊回覆規則】
 - 你只能扮演 ${character.name}。
 - 必須查看使用者 OC、重要記憶與最近上下文。
-- 約 80 到 130 字。
+- 約 100 到 200 字。
 - 可以先用一小段 *動作或心理描寫*。
 - 角色說話請用 **粗體**，而且台詞必須獨立成段，前後留空白行。
 - 不要亂分行；自然小說段落即可。
@@ -652,7 +673,13 @@ async function createOpenAIResponse(payload) {
     body: JSON.stringify(payload)
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error?.message || "OpenAI API request failed");
+  if (!response.ok) {
+    const message = data.error?.message || "OpenAI API request failed";
+    if (payload.model !== "gpt-4o" && /model|not found|not exist|does not exist|unsupported/i.test(message)) {
+      return createOpenAIResponse({ ...payload, model: "gpt-4o" });
+    }
+    throw new Error(message);
+  }
   return extractResponseText(data);
 }
 

@@ -6,16 +6,31 @@ const STORAGE_MODEL = "dream_sugar_chat_model";
 const STORAGE_EXTRA = "dream_sugar_oc_extra";
 const STORAGE_NOTIFICATIONS = "dream_sugar_notifications";
 const STORAGE_LIKES = "dream_sugar_likes";
+const STORAGE_REPOSTS = "dream_sugar_reposts";
+const STORAGE_BOOKMARKS = "dream_sugar_bookmarks";
+const STORAGE_FOLLOWS = "dream_sugar_follows";
+const STORAGE_SEEN_FOLLOW_POSTS = "dream_sugar_seen_follow_posts";
+const STORAGE_CHAT_NICKNAME = "dream_sugar_chat_nickname";
+const STORAGE_ADMIN_METRICS = "dream_sugar_admin_metrics";
+const STORAGE_FAKE_COMMENTS = "dream_sugar_fake_comments";
 const DEFAULT_MODEL = "gpt-4o";
-const CHAT_MODELS = ["gpt-4o", "gpt-4o-mini"];
+const CHAT_MODELS = ["gpt-4.1", "gpt-4o", "gpt-4o-mini"];
 const POST_AI_DELAY_MS = 30000;
 
 let session = loadJSON(STORAGE_SESSION, null);
 let messages = loadJSON(STORAGE_MESSAGES, {});
 let ocExtra = loadJSON(STORAGE_EXTRA, {});
 let notifications = loadJSON(STORAGE_NOTIFICATIONS, []);
-let likedPostIds = loadJSON(STORAGE_LIKES, []);
+let likedPostMap = normalizeReactionMap(loadJSON(STORAGE_LIKES, {}));
+let repostedPostMap = normalizeReactionMap(loadJSON(STORAGE_REPOSTS, {}));
+let bookmarkedPostMap = normalizeReactionMap(loadJSON(STORAGE_BOOKMARKS, {}));
+let followedCharacterIds = loadJSON(STORAGE_FOLLOWS, []);
+let seenFollowPostIds = loadJSON(STORAGE_SEEN_FOLLOW_POSTS, []);
+let chatNickname = localStorage.getItem(STORAGE_CHAT_NICKNAME) || "";
+let adminMetrics = loadJSON(STORAGE_ADMIN_METRICS, {});
+let fakeComments = loadJSON(STORAGE_FAKE_COMMENTS, {});
 let authMode = "login";
+let adminActiveTab = "oc";
 let currentView = "home";
 let currentProfileTab = "posts";
 let currentProfileCharacterId = "guest_player";
@@ -161,7 +176,7 @@ function normalizeCharacter(item) {
 }
 
 function normalizePost(post) {
-  return {
+  const normalized = {
     id: String(post.id),
     author_id: post.author_id || "system",
     character_id: post.character_id || getPlayerCharacter().id,
@@ -183,6 +198,8 @@ function normalizePost(post) {
       }))
     }))
   };
+  normalized.comments = [...normalized.comments, ...(fakeComments[normalized.id] || [])];
+  return normalized;
 }
 
 function renderShell() {
@@ -209,7 +226,8 @@ function titleForView() {
     profile: "個人頁",
     auth: authMode === "login" ? "登入" : "註冊",
     member: "會員專區",
-    oc: "OC 設定",
+    oc: "OC 角色設定",
+    profileEdit: "編輯個人頁",
     aiRequest: "AI 申請",
     admin: "管理者模式",
     aiMemory: "AI 記憶"
@@ -225,6 +243,7 @@ function showView(viewName, viewId) {
   const navMap = { home: "navHome", search: "navSearch", messages: "navMessages", profile: "navProfile" };
   if (navMap[viewName]) document.getElementById(navMap[viewName])?.classList.add("active");
   document.getElementById("backBtn").style.display = viewName === "home" ? "none" : "inline-flex";
+  document.getElementById("refreshBtn").style.display = viewName === "home" ? "inline-flex" : "none";
   renderShell();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -261,6 +280,12 @@ function showOCSettings() {
   fillOCForm();
 }
 
+function showProfileEditor() {
+  if (!session) return requireLogin();
+  showView("profileEdit", "profileEditView");
+  fillOCForm();
+}
+
 function showAIRequestPage() {
   if (!session) return requireLogin();
   showView("aiRequest", "aiRequestView");
@@ -269,10 +294,13 @@ function showAIRequestPage() {
 
 function showAdminPanel() {
   if (!isAdmin()) return showToast("只有 @kaede_728 可以使用管理者模式");
+  adminActiveTab = "oc";
   showView("admin", "adminView");
   renderAdminAIPostTools();
+  renderAdminPostMaintenance();
   renderAdminCharacters();
   renderAdminRequests();
+  renderAdminTabs();
 }
 
 function showMessages(characterId = currentChatUser) {
@@ -300,7 +328,7 @@ function goBack() {
   if (currentView === "messages") return showHome();
   if (currentView === "profile") return showHome();
   if (currentView === "aiMemory") return showMessages(currentChatUser);
-  if (["oc", "aiRequest", "admin"].includes(currentView)) return showMemberArea();
+  if (["oc", "profileEdit", "aiRequest", "admin"].includes(currentView)) return showMemberArea();
   showHome();
 }
 
@@ -318,6 +346,8 @@ function refreshCurrentView() {
     renderAdminAIPostTools();
     renderAdminCharacters();
     renderAdminRequests();
+    renderAdminPostMaintenance();
+    renderAdminTabs();
   }
 }
 
@@ -335,10 +365,13 @@ function renderPost(post) {
   const author = getProfile(post.author_id);
   const poster = getCharacter(post.character_id);
   const targetAI = post.ai_character_id ? getCharacter(post.ai_character_id) : null;
-  const liked = likedPostIds.includes(post.id);
+  const liked = isReactedByCurrentCharacter(likedPostMap, post.id);
+  const reposted = isReactedByCurrentCharacter(repostedPostMap, post.id);
+  const bookmarked = isReactedByCurrentCharacter(bookmarkedPostMap, post.id);
+  const stats = getPostDisplayStats(post);
   const canModify = session && (isAdmin() || post.author_id === session.id);
   return `
-    <article class="thread-post">
+    <article class="thread-post" id="post-${post.id}">
       <div class="thread-rail">
         <button class="avatar-button" onclick="showProfile('${escapeAttribute(poster.id)}')">
           <img class="avatar" src="${escapeAttribute(poster.avatar_url || author.avatar_url || "images/kaede.jpg")}" alt="${escapeAttribute(poster.name)}">
@@ -358,9 +391,11 @@ function renderPost(post) {
         ${targetAI ? `<div class="tag-row">標記 AI：<button onclick="showProfile('${targetAI.id}')">${escapeHTML(targetAI.handle)} ${escapeHTML(targetAI.name)}</button></div>` : ""}
         ${post.image_url ? `<img class="post-image" src="${escapeAttribute(post.image_url)}" alt="">` : ""}
         <div class="actions">
-          <button class="action ${liked ? "liked" : ""}" onclick="toggleLike('${post.id}')">${liked ? "♥ 已喜歡" : "♡ 喜歡"}</button>
-          <button class="action" onclick="focusComment('${post.id}')">↪ 回覆</button>
+          <button class="action ${liked ? "liked" : ""}" onclick="toggleLike('${post.id}')" aria-label="喜歡">${liked ? "♥" : "♡"}</button>
+          <button class="action ${reposted ? "liked" : ""}" onclick="toggleRepost('${post.id}')" aria-label="轉發">↪</button>
+          <button class="action ${bookmarked ? "liked" : ""}" onclick="toggleBookmark('${post.id}')" aria-label="收藏">${bookmarked ? "⭐" : "☆"}</button>
         </div>
+        <div class="post-counts">♥ ${stats.likes} · 💬 ${stats.comments} · ↪ ${stats.reposts} · ↗ ${stats.shares}</div>
         <div class="comments">${renderComments(post)}</div>
         <div class="reply-input mention-wrap">
           <input id="commentInput-${post.id}" placeholder="${session ? "留言，輸入 @ 可選擇 AI 或玩家。" : "訪客只能觀看，登入後才能留言。"}" oninput="handleMentionInput('commentInput-${post.id}')" onkeydown="handleCommentKey(event, '${post.id}')">
@@ -494,7 +529,7 @@ async function requestPostAIReply(postId, aiCharacterId) {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || `API ${response.status}`);
     post.comments.push(normalizePost({ comments: [data.comment] }).comments[0]);
-    addNotification(`${getCharacter(aiCharacterId).name} 回覆了你的貼文`, data.comment.replies?.[0]?.text || "");
+    addNotification(`${getCharacter(aiCharacterId).name} 回覆了你的貼文`, data.comment.replies?.[0]?.text || "", true, aiCharacterId);
     refreshCurrentView();
   } catch (error) {
     showToast(error.message || "AI 回覆貼文失敗");
@@ -572,8 +607,8 @@ async function submitPostComment(postId) {
     if (!response.ok) throw new Error(data.error || `API ${response.status}`);
     const index = post.comments.findIndex(comment => comment.id === tempComment.id);
     if (index >= 0) post.comments[index] = normalizePost({ comments: [data.comment] }).comments[0];
-    if (data.comment?.replies?.length) addNotification("AI 回覆了你的留言", data.comment.replies[0].text);
-    if (post.author_id !== session.id) addNotification("有人回覆了你的貼文", text);
+    if (data.comment?.replies?.length) addNotification("AI 回覆了你的留言", data.comment.replies[0].text, true, mentionedAI?.id);
+    if (post.author_id !== session.id) addNotification("有人回覆了你的貼文", text, true, getPlayerCharacter().id);
     notifyMentions(text, "有人在留言中提到了你");
     await refreshRemoteData({ silent: true });
   } catch (error) {
@@ -709,13 +744,48 @@ async function saveProfile() {
   }
 }
 
+async function saveProfilePage() {
+  if (!session) return requireLogin();
+  if (!hasPlayerOC()) return requireOC();
+  await saveProfile();
+  const character = getPlayerCharacter();
+  const avatarDataUrl = await getCroppedDataUrl("ocAvatar", 512, 512);
+  const coverDataUrl = await getCroppedDataUrl("ocCover", 1200, 450);
+  const payload = {
+    ownerId: session.id,
+    characterId: character.id,
+    name: character.name,
+    handle: character.handle,
+    personality: character.personality,
+    appearance: character.appearance,
+    speakingStyle: character.speaking_style,
+    prompt: character.prompt || "",
+    avatarDataUrl
+  };
+  try {
+    const response = await fetch("/api/characters", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `API ${response.status}`);
+    const updated = normalizeCharacter(data.character);
+    characters[updated.id] = updated;
+    setOCExtra(updated.id, { bio: getValue("ocBioInput"), cover_url: coverDataUrl || getOCExtra(updated.id).cover_url });
+    renderShell();
+    showToast("個人頁已儲存");
+    showProfile(updated.id);
+  } catch (error) {
+    showToast(error.message || "個人頁儲存失敗");
+  }
+}
+
 async function createOC() {
   if (!session) return requireLogin();
   const name = normalizeText(getValue("ocNameInput"));
   const handle = normalizeHandle(getValue("ocHandleInput"));
   if (!name || !handle) return showToast("請填角色名稱和 @帳號");
-  const avatarDataUrl = await getCroppedDataUrl("ocAvatar", 512, 512);
-  const coverDataUrl = await getCroppedDataUrl("ocCover", 1200, 450);
   const payload = {
     ownerId: session.id,
     characterId: session.player_character_id,
@@ -725,7 +795,7 @@ async function createOC() {
     appearance: getValue("ocAppearanceInput"),
     speakingStyle: getValue("ocSpeakingInput"),
     prompt: "",
-    avatarDataUrl
+    avatarDataUrl: ""
   };
   try {
     const response = await fetch("/api/characters", {
@@ -740,7 +810,7 @@ async function createOC() {
     session = { ...session, player_character_id: character.id };
     profiles[session.id] = { ...profiles[session.id], player_character_id: character.id };
     saveJSON(STORAGE_SESSION, session);
-    setOCExtra(character.id, { bio: getValue("ocBioInput"), cover_url: coverDataUrl || getOCExtra(character.id).cover_url });
+    setOCExtra(character.id, { bio: getOCExtra(character.id).bio, cover_url: getOCExtra(character.id).cover_url });
     renderShell();
     showToast("OC 已儲存");
     showProfile(character.id);
@@ -800,7 +870,17 @@ function renderMessages() {
 }
 
 function renderMessageItem(item) {
-  return formatChatMessageBlocks(item.text, item.role === "me" ? "me" : "them");
+  const role = item.role === "me" ? "me" : "them";
+  const speaker = role === "me" ? getChatSelfIdentity() : getCharacter(currentChatUser);
+  return `
+    <div class="message-row ${role}">
+      <img class="avatar small" src="${escapeAttribute(speaker.avatar_url || "images/guest-avatar.svg")}" alt="${escapeAttribute(speaker.name)}">
+      <div class="message-stack">
+        <div class="message-name">${escapeHTML(speaker.name)}</div>
+        ${formatChatMessageBlocks(item.text, role)}
+      </div>
+    </div>
+  `;
 }
 
 function formatChatMessageBlocks(text, role) {
@@ -845,6 +925,15 @@ function getConversation(characterId) {
   return messages[characterId];
 }
 
+function getChatSelfIdentity() {
+  const character = getPlayerCharacter();
+  return {
+    ...character,
+    name: chatNickname || character.name || "我",
+    avatar_url: character.avatar_url || "images/guest-avatar.svg"
+  };
+}
+
 function openConversation(characterId) {
   currentChatUser = characterId;
   renderMessages();
@@ -875,12 +964,26 @@ async function sendMessage() {
   input.value = "";
   saveJSON(STORAGE_MESSAGES, messages);
   renderMessages();
-  setText("chatStatus", `${character.name} 正在回覆...`);
+  showTypingBubble(character);
   const reply = await createCharacterReply(character, text, { history: conversation.slice(-12) });
   conversation.push({ role: "them", text: reply });
   saveJSON(STORAGE_MESSAGES, messages);
   setText("chatStatus", "");
   renderMessages();
+}
+
+function showTypingBubble(character) {
+  const status = document.getElementById("chatStatus");
+  if (!status) return;
+  status.innerHTML = `
+    <div class="typing-row">
+      <img class="avatar small" src="${escapeAttribute(character.avatar_url)}" alt="${escapeAttribute(character.name)}">
+      <div>
+        <div class="message-name">${escapeHTML(character.name)}</div>
+        <div class="typing-bubble"><span></span><span></span><span></span></div>
+      </div>
+    </div>
+  `;
 }
 
 async function createCharacterReply(character, text, context) {
@@ -919,6 +1022,7 @@ function showAIMemoryPage(characterId = currentChatUser) {
   setValue("aiMemoryPageInput", setting.memory || "");
   setValue("aiModePageInput", setting.interaction_mode || "");
   setValue("aiNicknamePageInput", setting.nickname || "");
+  setValue("chatNicknamePageInput", chatNickname || getPlayerCharacter().name || "");
   setValue("aiRulesPageInput", setting.rules || "");
 }
 
@@ -930,6 +1034,8 @@ async function saveAIMemoryPage() {
     nickname: getValue("aiNicknamePageInput"),
     rules: getValue("aiRulesPageInput")
   });
+  chatNickname = normalizeText(getValue("chatNicknamePageInput"));
+  localStorage.setItem(STORAGE_CHAT_NICKNAME, chatNickname);
   showMessages(currentChatUser);
 }
 
@@ -1023,6 +1129,81 @@ function renderAdminAIPostTools() {
   if (replyPostSelect) replyPostSelect.innerHTML = postOptions || `<option value="">目前沒有貼文</option>`;
 }
 
+function renderAdminPostMaintenance() {
+  const select = document.getElementById("adminMaintainPostSelect");
+  if (!select) return;
+  const current = select.value;
+  select.innerHTML = sortPosts(posts).map(post => {
+    const poster = getCharacter(post.character_id);
+    return `<option value="${post.id}">${escapeHTML(`${poster.name}｜${post.text.slice(0, 34) || "圖片貼文"}`)}</option>`;
+  }).join("") || `<option value="">目前沒有貼文</option>`;
+  if (current && posts.some(post => post.id === current)) select.value = current;
+  loadAdminPostMaintenance();
+}
+
+function loadAdminPostMaintenance() {
+  const postId = getValue("adminMaintainPostSelect");
+  const metrics = adminMetrics[postId] || {};
+  setValue("adminMetricLikes", metrics.likes ?? 0);
+  setValue("adminMetricComments", metrics.comments ?? 0);
+  setValue("adminMetricReposts", metrics.reposts ?? 0);
+  setValue("adminMetricShares", metrics.shares ?? 0);
+}
+
+function saveAdminPostMetrics() {
+  if (!isAdmin()) return showToast("只有 @kaede_728 可以管理");
+  const postId = getValue("adminMaintainPostSelect");
+  if (!postId) return showToast("請先選擇貼文");
+  adminMetrics[postId] = {
+    likes: Math.max(0, getNumber("adminMetricLikes", 0)),
+    comments: Math.max(0, getNumber("adminMetricComments", 0)),
+    reposts: Math.max(0, getNumber("adminMetricReposts", 0)),
+    shares: Math.max(0, getNumber("adminMetricShares", 0))
+  };
+  saveJSON(STORAGE_ADMIN_METRICS, adminMetrics);
+  refreshCurrentView();
+  showToast("貼文數據已更新");
+}
+
+function adminAddFakeComment() {
+  if (!isAdmin()) return showToast("只有 @kaede_728 可以管理");
+  const postId = getValue("adminMaintainPostSelect");
+  const text = normalizeText(getValue("fakeCommentTextInput"));
+  if (!postId || !text) return showToast("請選擇貼文並輸入留言");
+  const fakeId = `fake_${normalizeHandle(getValue("fakeCommentHandleInput") || "fake") || Date.now()}`;
+  const comment = {
+    id: `fake_comment_${Date.now()}`,
+    author_id: fakeId,
+    fake_name: normalizeText(getValue("fakeCommentNameInput")) || "匿名甜粉",
+    fake_handle: normalizeHandle(getValue("fakeCommentHandleInput")) || "fake_sugar",
+    text,
+    ai_character_id: null,
+    created_at: new Date().toISOString(),
+    replies: []
+  };
+  fakeComments[postId] = [...(fakeComments[postId] || []), comment];
+  saveJSON(STORAGE_FAKE_COMMENTS, fakeComments);
+  const post = posts.find(item => item.id === postId);
+  if (post) post.comments.push(comment);
+  setValue("fakeCommentTextInput", "");
+  refreshCurrentView();
+  showToast("假帳號留言已新增");
+}
+
+function setAdminTab(tab) {
+  adminActiveTab = tab;
+  renderAdminTabs();
+}
+
+function renderAdminTabs() {
+  document.querySelectorAll("[data-admin-tab]").forEach(button => {
+    button.classList.toggle("active", button.dataset.adminTab === adminActiveTab);
+  });
+  document.querySelectorAll("[data-admin-section]").forEach(section => {
+    section.hidden = section.dataset.adminSection !== adminActiveTab;
+  });
+}
+
 function renderAdminCharacterCard(character) {
   const owner = getProfile(character.owner_id);
   return `
@@ -1036,6 +1217,7 @@ function renderAdminCharacterCard(character) {
         </div>
       </button>
       <button class="danger-btn" onclick="adminDeleteCharacter('${character.id}')">刪除 OC</button>
+      <button class="ghost-btn" onclick="toggleFollow('${character.id}')">${followedCharacterIds.includes(character.id) ? "取消追蹤" : "追蹤"}</button>
     </div>
   `;
 }
@@ -1148,23 +1330,39 @@ function renderProfile() {
   const character = getCharacter(currentProfileCharacterId);
   const extra = getOCExtra(character.id);
   const ownedPosts = posts.filter(post => post.character_id === character.id || post.ai_character_id === character.id);
+  const isOwnProfile = session && getPlayerCharacter().id === character.id;
+  const followed = followedCharacterIds.includes(character.id);
   document.getElementById("profileArea").innerHTML = `
     <div class="profile-cover" style="${extra.cover_url ? `background-image:url('${escapeAttribute(extra.cover_url)}')` : ""}"></div>
     <div class="profile-inner">
+      ${isOwnProfile ? `<button class="ghost-btn edit-profile-btn" onclick="showProfileEditor()">編輯個人頁</button>` : ""}
       <img class="avatar-big" src="${escapeAttribute(character.avatar_url)}" alt="${escapeAttribute(character.name)}">
       <div class="display-name">${escapeHTML(character.name)}</div>
       <div class="handle">${escapeHTML(character.handle)} ${character.isAI ? "AI 角色" : "玩家 OC"}</div>
       <p class="bio">${escapeHTML(extra.bio || character.bio || character.personality || "尚未填寫簡介")}</p>
       <div class="stats">
         <span><strong>${ownedPosts.length}</strong> 貼文</span>
-        <span><strong>${likedPostIds.length}</strong> 按讚</span>
+        <span><strong>${countReactionsForCharacter(likedPostMap, character.id)}</strong> 按讚</span>
+        <span><strong>${countReactionsForCharacter(repostedPostMap, character.id)}</strong> 轉發</span>
         <span><strong>${getProfileReplyCount(character.id)}</strong> 回覆</span>
       </div>
-      ${session && getPlayerCharacter().id === character.id ? `<button class="ghost-btn" onclick="showOCSettings()">編輯個人頁</button>` : ""}
+      ${session && !isOwnProfile && !character.isGuest ? `<button class="primary-btn follow-btn ${followed ? "following" : ""}" onclick="toggleFollow('${character.id}')">${followed ? "已追蹤" : "追蹤"}</button>` : ""}
+      ${renderFollowList(character)}
     </div>
   `;
   document.querySelectorAll("#profileView .tab").forEach(item => item.classList.remove("active"));
   document.querySelector(`#profileView .tab[onclick*="${currentProfileTab}"]`)?.classList.add("active");
+}
+
+function renderFollowList(character) {
+  const list = followedCharacterIds.map(id => getCharacter(id)).filter(item => item && !item.isDeleted);
+  if (getPlayerCharacter().id !== character.id || !list.length) return "";
+  return `
+    <section class="follow-list">
+      <strong>追蹤清單</strong>
+      <div>${list.map(item => `<button onclick="showProfile('${item.id}')"><img src="${escapeAttribute(item.avatar_url)}" alt=""><span>${escapeHTML(item.name)}</span></button>`).join("")}</div>
+    </section>
+  `;
 }
 
 function setProfileTab(tab, element) {
@@ -1177,16 +1375,90 @@ function setProfileTab(tab, element) {
 function renderProfileFeed() {
   const character = getCharacter(currentProfileCharacterId);
   let list = posts.filter(post => post.character_id === character.id || post.ai_character_id === character.id);
-  if (currentProfileTab === "liked") list = posts.filter(post => likedPostIds.includes(post.id));
-  if (currentProfileTab === "reposts") list = [];
+  if (currentProfileTab === "liked") list = posts.filter(post => likedPostMap[post.id] === character.id);
+  if (currentProfileTab === "reposts") list = posts.filter(post => repostedPostMap[post.id] === character.id);
   if (currentProfileTab === "replies") list = posts.filter(post => post.comments.some(comment => comment.replies.some(reply => reply.character_id === character.id) || comment.author_id === character.owner_id));
   renderFeed("profileFeed", sortPosts(list));
 }
 
 function toggleLike(postId) {
-  likedPostIds = likedPostIds.includes(postId) ? likedPostIds.filter(id => id !== postId) : [...likedPostIds, postId];
-  saveJSON(STORAGE_LIKES, likedPostIds);
+  likedPostMap = toggleReaction(likedPostMap, postId);
+  saveJSON(STORAGE_LIKES, likedPostMap);
   refreshCurrentView();
+}
+
+function toggleRepost(postId) {
+  repostedPostMap = toggleReaction(repostedPostMap, postId);
+  saveJSON(STORAGE_REPOSTS, repostedPostMap);
+  refreshCurrentView();
+}
+
+function toggleBookmark(postId) {
+  bookmarkedPostMap = toggleReaction(bookmarkedPostMap, postId);
+  saveJSON(STORAGE_BOOKMARKS, bookmarkedPostMap);
+  refreshCurrentView();
+}
+
+function toggleReaction(map, postId) {
+  if (!session) {
+    requireLogin();
+    return map;
+  }
+  const actorId = getPlayerCharacter().id;
+  const next = { ...map };
+  if (next[postId] === actorId) delete next[postId];
+  else next[postId] = actorId;
+  return next;
+}
+
+function isReactedByCurrentCharacter(map, postId) {
+  return Boolean(session && map[postId] === getPlayerCharacter().id);
+}
+
+function countReactionsForCharacter(map, characterId) {
+  return Object.values(map).filter(actorId => actorId === characterId).length;
+}
+
+function getPostDisplayStats(post) {
+  const metrics = adminMetrics[post.id] || {};
+  return {
+    likes: Object.prototype.hasOwnProperty.call(likedPostMap, post.id) ? 1 + Number(metrics.likes || 0) : Number(metrics.likes || 0),
+    comments: (post.comments || []).length + Number(metrics.comments || 0),
+    reposts: Object.prototype.hasOwnProperty.call(repostedPostMap, post.id) ? 1 + Number(metrics.reposts || 0) : Number(metrics.reposts || 0),
+    shares: Number(metrics.shares || 0)
+  };
+}
+
+function normalizeReactionMap(value) {
+  if (Array.isArray(value)) return Object.fromEntries(value.map(postId => [String(postId), "legacy"]));
+  return value && typeof value === "object" ? value : {};
+}
+
+function toggleFollow(characterId) {
+  if (!session) return requireLogin();
+  if (getPlayerCharacter().id === characterId) return showToast("不能追蹤自己");
+  const willFollow = !followedCharacterIds.includes(characterId);
+  followedCharacterIds = followedCharacterIds.includes(characterId)
+    ? followedCharacterIds.filter(id => id !== characterId)
+    : [...followedCharacterIds, characterId];
+  if (willFollow) {
+    seenFollowPostIds = [...new Set([...seenFollowPostIds, ...posts.filter(post => post.character_id === characterId).map(post => post.id)])];
+    saveJSON(STORAGE_SEEN_FOLLOW_POSTS, seenFollowPostIds);
+  }
+  saveJSON(STORAGE_FOLLOWS, followedCharacterIds);
+  renderProfile();
+  showToast(followedCharacterIds.includes(characterId) ? "已追蹤" : "已取消追蹤");
+}
+
+async function sharePost(postId) {
+  const url = `${location.origin}${location.pathname}#post-${postId}`;
+  try {
+    if (navigator.share) await navigator.share({ title: "夢糖庭院貼文", url });
+    else await navigator.clipboard.writeText(url);
+    showToast("分享連結已準備好");
+  } catch {
+    showToast("分享已取消");
+  }
 }
 
 function focusComment(postId) {
@@ -1202,26 +1474,37 @@ function focusComposer() {
 
 function renderNotifications() {
   const list = document.getElementById("notificationList");
-  list.innerHTML = notifications.length ? notifications.map(item => `
+  list.innerHTML = notifications.length ? notifications.map(item => {
+    const actor = getNotificationActor(item);
+    return `
     <div class="notification-card ${item.read ? "" : "unread"}">
-      <strong>${escapeHTML(item.title)}</strong>
-      <p>${escapeHTML(item.body || "")}</p>
-      <span>${formatTime(item.created_at)}</span>
+      <img class="avatar" src="${escapeAttribute(actor.avatar_url)}" alt="${escapeAttribute(actor.name)}">
+      <div>
+        <strong>${escapeHTML(actor.name)} <small>${escapeHTML(actor.handle || "")}</small></strong>
+        <p>${escapeHTML(item.body || item.title || "")}</p>
+        <span>${escapeHTML(item.title)} · ${formatTime(item.created_at)}</span>
+      </div>
     </div>
-  `).join("") : `<div class="empty slim">目前沒有通知。</div>`;
+  `;
+  }).join("") : `<div class="empty slim">目前沒有通知。</div>`;
   notifications = notifications.map(item => ({ ...item, read: true }));
   saveJSON(STORAGE_NOTIFICATIONS, notifications);
   renderBadge();
 }
 
-function addNotification(title, body = "", push = true) {
-  notifications.unshift({ id: `n_${Date.now()}`, title, body, created_at: new Date().toISOString(), read: false });
+function addNotification(title, body = "", push = true, actorId = "") {
+  notifications.unshift({ id: `n_${Date.now()}`, title, body, actorId, created_at: new Date().toISOString(), read: false });
   notifications = notifications.slice(0, 80);
   saveJSON(STORAGE_NOTIFICATIONS, notifications);
   renderBadge();
   if (push && "Notification" in window && Notification.permission === "granted") {
     new Notification(title, { body, icon: "images/icon.png" });
   }
+}
+
+function getNotificationActor(item) {
+  if (item.actorId) return getCharacter(item.actorId);
+  return getPlayerCharacter();
 }
 
 function renderBadge() {
@@ -1243,15 +1526,22 @@ function scanNotifications() {
   const mine = getPlayerCharacter();
   for (const post of posts) {
     if (post.author_id !== session.id && getMentionedUserHandles(post.text).includes(normalizeHandle(mine.handle))) {
-      addNotification("有人在貼文中提到了你", post.text, false);
+      addNotification("有人在貼文中提到了你", post.text, false, post.character_id);
+    }
+    if (followedCharacterIds.includes(post.character_id) && post.author_id !== session.id && !seenFollowPostIds.includes(post.id)) {
+      const character = getCharacter(post.character_id);
+      addNotification(`${character.name} 發布了新貼文`, post.text || "有一篇新的圖片貼文", false, character.id);
+      seenFollowPostIds.push(post.id);
     }
   }
+  seenFollowPostIds = [...new Set(seenFollowPostIds)].slice(-400);
+  saveJSON(STORAGE_SEEN_FOLLOW_POSTS, seenFollowPostIds);
 }
 
 function notifyMentions(text, title) {
   if (!session) return;
   const mine = getPlayerCharacter();
-  if (getMentionedUserHandles(text).includes(normalizeHandle(mine.handle))) addNotification(title, text);
+  if (getMentionedUserHandles(text).includes(normalizeHandle(mine.handle))) addNotification(title, text, true, mine.id);
 }
 
 function setupCropInputs() {
@@ -1282,6 +1572,7 @@ function updateCropPreview(key) {
   const y = getNumber(`${key}CropY`, 50);
   const zoom = getNumber(`${key}CropZoom`, 100);
   preview.style.objectPosition = `${x}% ${y}%`;
+  preview.style.transformOrigin = `${x}% ${y}%`;
   preview.style.transform = `scale(${zoom / 100})`;
 }
 
@@ -1326,6 +1617,9 @@ function hasPlayerOC() {
 }
 
 function getProfile(id) {
+  if (String(id || "").startsWith("fake_")) {
+    return getFakeProfile(id);
+  }
   const profile = profiles[id];
   if (!profile) return profiles.system;
   if (profile.player_character_id && characters[profile.player_character_id]) {
@@ -1333,6 +1627,18 @@ function getProfile(id) {
     return { ...profile, display_name: character.name, avatar_url: character.avatar_url };
   }
   return profile;
+}
+
+function getFakeProfile(id) {
+  const all = Object.values(fakeComments).flat();
+  const comment = all.find(item => item.author_id === id);
+  return {
+    id,
+    username: comment?.fake_handle || "fake",
+    display_name: comment?.fake_name || "假帳號",
+    avatar_url: "images/guest-avatar.svg",
+    player_character_id: null
+  };
 }
 
 function getCharacter(id) {
@@ -1357,15 +1663,26 @@ function getAICharacters() {
 }
 
 function getUserCharacters() {
-  return Object.values(characters).filter(character => !character.isAI && !character.isGuest);
+  return Object.values(characters).filter(character => !character.isAI && !character.isGuest && character.id !== "kaede_player");
 }
 
 function getMentionTargets() {
-  return [...getUserCharacters(), ...getAICharacters()];
+  const adminMention = getAdminMentionCharacter();
+  const targets = [...getUserCharacters(), ...getAICharacters()];
+  return adminMention ? [adminMention, ...targets.filter(item => normalizeHandle(item.handle) !== "kaede_728")] : targets;
+}
+
+function getAdminMentionCharacter() {
+  const adminProfile = Object.values(profiles).find(profile => profile.username === "kaede_728");
+  if (adminProfile?.player_character_id && characters[adminProfile.player_character_id]) {
+    return { ...characters[adminProfile.player_character_id], handle: "@kaede_728" };
+  }
+  if (isAdmin()) return { ...getPlayerCharacter(), handle: "@kaede_728" };
+  return playerDefault;
 }
 
 function getChatCharacters() {
-  return getAICharacters();
+  return getAICharacters().filter(character => character.id !== "staff");
 }
 
 function getMentionedAICharacter(text) {
@@ -1533,6 +1850,7 @@ Object.assign(window, {
   showAuth,
   showMemberArea,
   showOCSettings,
+  showProfileEditor,
   showAIRequestPage,
   showAdminPanel,
   showMessages,
@@ -1554,6 +1872,7 @@ Object.assign(window, {
   toggleAuthMode,
   logout,
   saveProfile,
+  saveProfilePage,
   createOC,
   renderSearch,
   openConversation,
@@ -1563,10 +1882,18 @@ Object.assign(window, {
   submitAIRequest,
   adminCreateAIPost,
   adminCreateAIReply,
+  setAdminTab,
+  loadAdminPostMaintenance,
+  saveAdminPostMetrics,
+  adminAddFakeComment,
   adminUpdateRequest,
   adminDeleteCharacter,
   setProfileTab,
   toggleLike,
+  toggleRepost,
+  toggleBookmark,
+  toggleFollow,
+  sharePost,
   focusComment,
   focusComposer,
   requestNotificationPermission

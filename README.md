@@ -15,13 +15,31 @@ Start Command: npm start
 
 ```text
 OPENAI_API_KEY=你的 OpenAI API Key
-OPENAI_MODEL=gpt-5.2
+OPENAI_MODEL=gpt-4o
+OPENAI_REPLY_MODEL=gpt-4.1
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=你的 Supabase service role key
 SUPABASE_AVATAR_BUCKET=avatars
 ```
 
 `.env` 不要上傳 GitHub，範例請看 `.env.example`。
+
+## 本機預覽
+
+第一次在本機跑：
+
+```text
+npm install
+npm start
+```
+
+打開：
+
+```text
+http://localhost:3001
+```
+
+之後只要改前端檔案，重新整理瀏覽器就能看；如果改 `server.js`，請停掉終端機再重新 `npm start`。
 
 ## Supabase
 
